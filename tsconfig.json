@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "allowSyntheticDefaultImports": true,
+        "experimentalDecorators": true,
+        "module": "es6",
+        "moduleResolution": "node",
+        "noEmit": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitAny": false,
+        "noImplicitReturns": true,
+        "noUnusedParameters": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "strict": true,
+        "target": "es5"
+    }
+}
