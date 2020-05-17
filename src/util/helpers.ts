@@ -1,3 +1,5 @@
+import { NodeBlueCondition } from "../core/types";
+
 export interface ICollection<T> {
     $collection: {
         name: string;
@@ -76,29 +78,31 @@ export const collection = <T>(
 };
 
 // TODO: Fix event typing
-// TODO: Fix triggerBuilder typing
-export const createHandler = (triggerBuilder: any) => (event: any) => {
+// TODO: Fix builder typing
+export const createCondition = (builder: any): NodeBlueCondition => (
+    event: any
+) => {
     const { data } = event;
     const { old_state, new_state } = data;
 
     // Check for entityId match, if set:
-    if (triggerBuilder.entityId) {
-        if (triggerBuilder.entityId !== data.entity_id) return false;
+    if (builder.entityId) {
+        if (builder.entityId !== data.entity_id) return false;
     }
 
     // Check if the state has changed at all:
-    if (triggerBuilder.onlyStateChanges) {
+    if (builder.onlyStateChanges || builder.fromState || builder.toState) {
         if (old_state.state === new_state.state) return false;
     }
 
     // Check for fromState match:
-    if (triggerBuilder.fromState) {
-        if (old_state.state !== triggerBuilder.fromState) return false;
+    if (builder.fromState) {
+        if (old_state.state !== builder.fromState) return false;
     }
 
     // Check for toState match:
-    if (triggerBuilder.toState) {
-        if (new_state.state !== triggerBuilder.toState) return false;
+    if (builder.toState) {
+        if (new_state.state !== builder.toState) return false;
     }
 
     // All checks passed!

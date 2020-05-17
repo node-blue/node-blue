@@ -1,9 +1,11 @@
 export type NodeBlueCallback = () => void;
 
-export type NodeBlueCondition = () => boolean | string;
+export type NodeBlueCondition = (event: any) => boolean;
 
-export type NodeBlueHandler = {
+export type NodeBlueEventHandler = (event: any) => void;
+
+export type NodeBlueEventHandlerInCollection = {
     hash: string;
     // TODO: Fix event typing
-    handler: (event: any) => Promise<void>;
+    eventHandler: NodeBlueEventHandler;
 };

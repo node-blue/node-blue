@@ -3,17 +3,24 @@ import { createServer } from "http";
 
 import { createClient } from "./hass";
 import NodeBlueHandlerBuilder from "./core/HandlerBuilder";
-import { NodeBlueCondition, NodeBlueHandler } from "./core/types";
+import {
+    NodeBlueCondition,
+    NodeBlueEventHandlerInCollection,
+} from "./core/types";
 import { collection } from "./util/helpers";
 
 config();
 
 const { HASS_URL, HASS_TOKEN } = process.env;
 
-const handlers = collection<NodeBlueHandler>([], "hash", "handlers");
+const eventHandlers = collection<NodeBlueEventHandlerInCollection>(
+    [],
+    "hash",
+    "eventHandlers"
+);
 
 const when = (condition: NodeBlueCondition) =>
-    new NodeBlueHandlerBuilder(condition, handlers);
+    new NodeBlueHandlerBuilder(condition, eventHandlers);
 
 const init = async () => {
     const homeAssistant = await createClient({
@@ -23,7 +30,17 @@ const init = async () => {
 
     // TODO: Fix event typing
     homeAssistant.onStateChanged((event: any) => {
-        Promise.all(handlers.getAll().map(({ handler }) => handler(event)));
+        // Handle the event in every available handler:
+        Promise.all(
+            eventHandlers.getAll().map(({ eventHandler }) => {
+                // Cancel running timer:
+                // @ts-ignore
+                eventHandler.cancel();
+
+                // Call event handler:
+                eventHandler(event);
+            })
+        );
     });
 };
 
