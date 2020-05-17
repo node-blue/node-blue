@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 
-import { getDefaultHandler } from "../util/helpers";
-import { NodeBlueCallback, NodeBlueCondition } from "../util/types";
+import { NodeBlueCallback, NodeBlueCondition } from "../core/types";
+import { createHandler } from "../util/helpers";
 
 export default class NodeBlueHandlerBuilder {
     private callback: NodeBlueCallback;
@@ -52,7 +52,7 @@ export default class NodeBlueHandlerBuilder {
 
         // Use user-provided handler or build own:
         // TODO: Fix event typing
-        const condition = this.condition || getDefaultHandler(this);
+        const condition = this.condition || createHandler(this);
 
         // Generate a unique has based on the object's properties:
         const hash = createHash("md5")

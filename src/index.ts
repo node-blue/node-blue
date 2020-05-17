@@ -3,8 +3,8 @@ import { createServer } from "http";
 
 import { createClient } from "./hass";
 import NodeBlueHandlerBuilder from "./core/HandlerBuilder";
-import collection from "./util/collection";
-import { NodeBlueCondition, NodeBlueHandler } from "./util/types";
+import { NodeBlueCondition, NodeBlueHandler } from "./core/types";
+import { collection } from "./util/helpers";
 
 config();
 
