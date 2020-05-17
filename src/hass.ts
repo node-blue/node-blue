@@ -1,16 +1,22 @@
 import EventEmitter from "events";
 import WebSocket, { MessageEvent } from "isomorphic-ws";
 
+import collection, { ICollection } from "./util/collection";
+
+export type Callback = (...args: any[]) => void;
+
 interface Client {
     seq: number;
     options: Options;
     resultMap: object;
+    // subscriptions: ICollection<any>;
     subscriptions: object;
     emitter: EventEmitter.EventEmitter;
     ws: WebSocket;
 }
 
-interface HomeAssistantClient {
+// FIXME: fix typings
+export interface HomeAssistantClient {
     rawClient: Client;
     getStates: () => Promise<unknown>;
     getServices: () => Promise<unknown>;
@@ -36,6 +42,7 @@ interface HomeAssistantClient {
     ) => Promise<unknown>;
 }
 
+// FIXME: This interface is useless as it is, fix or remove
 interface Message {
     [key: string]: any;
 }
@@ -58,17 +65,18 @@ const defaultOptions: Options = {
     path: "/api/websocket",
     token: "",
 
-    messageSerializer: (outgoingMessage) => JSON.stringify(outgoingMessage),
+    messageSerializer: (outgoingMessage: object) =>
+        JSON.stringify(outgoingMessage),
     messageParser: (incomingMessage) =>
         JSON.parse(incomingMessage.data.toString()),
 
-    ws: (opts: Options) =>
+    ws: (options: Options) =>
         new WebSocket(
-            `${opts.protocol}://${opts.host}:${opts.port}${opts.path}`
+            `${options.protocol}://${options.host}:${options.port}${options.path}`
         ),
 };
 
-const command = async (commandArgs, client: Client) => {
+const command = async (commandArgs: { [key: string]: any }, client: Client) => {
     return new Promise((resolve, reject) => {
         const id = client.seq;
 
@@ -206,8 +214,8 @@ const clientObject = (client: Client): HomeAssistantClient => {
     };
 };
 
-const connectAndAuthorize = async (client: Client) => {
-    return new Promise<HomeAssistantClient>((resolve, reject) => {
+const connectAndAuthorize = async (client: Client) =>
+    new Promise<HomeAssistantClient>((resolve, reject) => {
         client.ws.onmessage = messageHandler(client);
         client.ws.onerror = (err) => reject(err);
 
@@ -217,30 +225,28 @@ const connectAndAuthorize = async (client: Client) => {
         );
         client.emitter.on("auth_required", () => {
             // If auth is required, immediately reject the promise if no token was provided:
-            if (!client.options.token) {
+            if (client.options.token === "") {
                 reject(
                     new Error(
-                        "Homeassistant requires authentication, but token not provided in options"
+                        "Home Assistant requires authentication, but no token was provided"
                     )
                 );
             }
 
-            client.ws.send(
-                client.options.messageSerializer({
-                    type: "auth",
-                    access_token: client.options.token,
-                })
-            );
+            const authMessage = {
+                type: "auth",
+                access_token: client.options.token,
+            };
+
+            client.ws.send(JSON.stringify(authMessage));
         });
     });
-};
 
-export const createClient = (callerOptions = {}) => {
+export const createClient = (callerOptions: Partial<Options> = {}) => {
     const options: Options = { ...defaultOptions, ...callerOptions };
 
-    if (options.token === "") {
-        throw new Error("Token cannot be undefined!");
-    }
+    // TODO: Add proper subscription type
+    // const subscriptions = collection<any>([], "_id", "Subscriptions");
 
     const client: Client = {
         seq: 1,

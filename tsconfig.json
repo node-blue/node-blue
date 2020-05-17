@@ -2,7 +2,7 @@
     "compilerOptions": {
         "allowSyntheticDefaultImports": true,
         "experimentalDecorators": true,
-        "module": "es6",
+        "module": "esnext",
         "moduleResolution": "node",
         "noEmit": true,
         "noFallthroughCasesInSwitch": true,
@@ -12,6 +12,6 @@
         "skipLibCheck": true,
         "resolveJsonModule": true,
         "strict": true,
-        "target": "es5"
+        "target": "es2017"
     }
 }
