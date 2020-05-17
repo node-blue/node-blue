@@ -1,8 +1,6 @@
 import EventEmitter from "events";
 import WebSocket, { MessageEvent } from "isomorphic-ws";
 
-import collection, { ICollection } from "./util/collection";
-
 export type Callback = (...args: any[]) => void;
 
 interface Client {
