@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
+import { HomeAssistantStateEvent } from "./homeassistant";
 
-export type RuleHandler = (event: any) => boolean;
+export type RuleHandler = (event: HomeAssistantStateEvent) => boolean;
 
 export class Rule {
     private handler: RuleHandler;

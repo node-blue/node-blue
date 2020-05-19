@@ -1,4 +1,4 @@
-import { Rule, EqualsRule, FieldChangedRule, OperatorRule } from "./rule";
+import { Rule, EqualsRule, FieldChangedRule } from "./rule";
 
 const ERR_NO_FURTHER_RULES = (field: string) =>
     `Ignoring call of \`${field}\` as no further rules are allowed. Most likely, you passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
@@ -100,13 +100,9 @@ export class Builder {
         return this;
     };
 
-    do = () => {
-        // TODO: Generate an event handler from this
-        // TODO: Add generated event handler to the stack
-
-        console.log("do was called");
-        console.log(this.rules);
-
-        return;
+    do = (callback: CallableFunction) => (event: any) => {
+        if (this.rules.every((rule) => rule.test(event) === true)) {
+            callback();
+        }
     };
 }
