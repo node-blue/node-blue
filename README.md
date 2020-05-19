@@ -118,7 +118,7 @@ when(() => {
 ## Roadmap / todo
 
 -   [ ] Exporting typescript declarations
--   [ ] Rewrite Home Assistant communication layer
+-   [x] Rewrite Home Assistant communication layer
 -   [ ] Expose a CLI
 -   [ ] Provide toolkit in callback to actually interact with Home Assistant
 -   [ ] Read from files (through CLI)
