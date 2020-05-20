@@ -1,20 +1,20 @@
 import { createHash } from "crypto";
-import { HomeAssistantStateEvent } from "./homeassistant";
+import get from "lodash.get";
 
-export type RuleHandler = (event: HomeAssistantStateEvent) => boolean;
+import { StateChangedEvent } from "./homeassistant";
+
+export type RuleHandler = (event: StateChangedEvent) => boolean;
 
 export class Rule {
-    private handler: RuleHandler;
     private hash: string;
+    public test: RuleHandler;
 
     constructor(handler: RuleHandler) {
-        this.handler = handler;
+        this.test = handler;
         this.hash = createHash("md5")
             .update(JSON.stringify(this))
             .digest("hex");
     }
-
-    public test = this.handler;
 }
 
 export class EmptyRule extends Rule {
@@ -27,8 +27,8 @@ export class EmptyRule extends Rule {
 
 export class EntityRule extends Rule {
     constructor(entity_id: string) {
-        const handler: RuleHandler = (event: any) => {
-            return event.entity_id === entity_id;
+        const handler: RuleHandler = (event) => {
+            return event.data.entity_id === entity_id;
         };
 
         super(handler);
@@ -36,11 +36,11 @@ export class EntityRule extends Rule {
 }
 
 export class EqualsRule extends Rule {
-    constructor(path: string, value: string) {
-        const handler: RuleHandler = (event: any) => {
-            const newValue = event.data.new_state[path];
+    constructor(path: string, expected: string) {
+        const handler: RuleHandler = (event) => {
+            const actual = get(event, `data.${path}`);
 
-            return newValue === value;
+            return actual === expected;
         };
 
         super(handler);
@@ -49,29 +49,11 @@ export class EqualsRule extends Rule {
 
 export class FieldChangedRule extends Rule {
     constructor(path: string) {
-        const handler: RuleHandler = (event: any) => {
-            const oldValue = event.data.old_state[path];
-            const newValue = event.data.old_state[path];
+        const handler: RuleHandler = (event) => {
+            const oldValue = get(event, `data.old_state.${path}`);
+            const newValue = get(event, `data.new_state.${path}`);
 
             return oldValue !== newValue;
-        };
-
-        super(handler);
-    }
-}
-
-export class OperatorRule extends Rule {
-    constructor(oldPath: string, operator: "==" | "!=", newPath: string) {
-        const handler: RuleHandler = (event: any) => {
-            const oldValue = event.data.old_state[oldPath];
-            const newValue = event.data.new_state[newPath];
-
-            switch (operator) {
-                case "==":
-                    return oldValue === newValue;
-                case "!=":
-                    return oldValue !== newValue;
-            }
         };
 
         super(handler);

@@ -1,7 +1,8 @@
 import { EventEmitter } from "events";
-import WebSocket, { MessageEvent } from "isomorphic-ws";
+import WebSocket = require("isomorphic-ws"); // ref: https://github.com/DefinitelyTyped/DefinitelyTyped/issues/36269
+import { MessageEvent } from "isomorphic-ws";
 
-import collection from "../util/collection";
+import { collection } from "../util/collection";
 
 export interface HomeAssistantClient {
     addEventListener: (
@@ -17,10 +18,41 @@ export interface HomeAssistantClient {
     sendCommand: (commandArgs?: object) => void;
 }
 export type HomeAssistantEventCallback = (...args: any[]) => void;
-export type HomeAssistantStateEvent = any;
-export type HomeAssistantStateEventHandler = (
-    event: HomeAssistantStateEvent
-) => void;
+export type HomeAssistantEntity = {
+    entity_id: string;
+    state: string;
+    last_changed: string;
+    last_updated: string;
+    attributes: {
+        friendly_name?: string;
+        unit_of_measurement?: string;
+        icon?: string;
+        entity_picture?: string;
+        supported_features?: number;
+        hidden?: boolean;
+        assumed_state?: boolean;
+        device_class?: string;
+        [key: string]: any;
+    };
+    context: {
+        id: string;
+        user_id: string | null;
+    };
+};
+export type StateChangedEvent = {
+    event_type: "state_changed";
+    data: {
+        entity_id: string;
+        old_state: HomeAssistantEntity | null;
+        new_state: HomeAssistantEntity | null;
+    };
+    origin: string;
+    context: {
+        id: string;
+        parent_id: string | null;
+        user_id: string | null;
+    };
+};
 
 interface Options {
     host: string;

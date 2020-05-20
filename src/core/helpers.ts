@@ -1,6 +1,12 @@
-import { HomeAssistantClient } from "../hass";
+import { HomeAssistantClient, HomeAssistantEntity } from "./homeassistant";
 
-// @ts-ignore
-export const getHelpers = (hass: HomeAssistantClient) => ({
-    entity: (entity_id: string): object => ({ entity_id }),
+export type HomeAssistantToolkit = {};
+
+export const createToolkit = (
+    hass: HomeAssistantClient
+): HomeAssistantToolkit => ({
+    entity: (entity_id: string): object => {
+        console.log(hass);
+        return { entity_id };
+    },
 });

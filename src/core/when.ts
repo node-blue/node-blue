@@ -5,7 +5,7 @@ export const when = (node?: RuleHandler | string) => {
     if (node === undefined || node === null) {
         // We are going to respond to all state changes, and no further rules
         // are allowed:
-        return new Builder([new EmptyRule()], false);
+        return new Builder([new EmptyRule()]);
     }
 
     if (typeof node === "string") {
@@ -14,7 +14,7 @@ export const when = (node?: RuleHandler | string) => {
 
         // We are going to respond to state changes for a specific entity,
         // and allow further specification of other rules:
-        return new Builder([new EntityRule("entity_id")]);
+        return new Builder([new EntityRule(node)]);
     }
 
     // The user has provided his own way of evaluating rules, so we

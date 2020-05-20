@@ -1,7 +1,19 @@
+import { StateChangedEvent } from "./homeassistant";
 import { Rule, EqualsRule, FieldChangedRule } from "./rule";
+import { HomeAssistantToolkit } from "./helpers";
 
 const ERR_NO_FURTHER_RULES = (field: string) =>
     `Ignoring call of \`${field}\` as no further rules are allowed. Most likely, you passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
+
+type NodeCallback = (
+    event: StateChangedEvent,
+    toolkit: HomeAssistantToolkit
+) => void;
+
+export type HomeAssistantStateEventHandler = (
+    event: StateChangedEvent,
+    toolkit: HomeAssistantToolkit
+) => void;
 
 export class Builder {
     public and = this; // TODO: allow multiple chains
@@ -100,9 +112,12 @@ export class Builder {
         return this;
     };
 
-    do = (callback: CallableFunction) => (event: any) => {
+    do = (callback: NodeCallback): HomeAssistantStateEventHandler => (
+        event,
+        toolkit
+    ) => {
         if (this.rules.every((rule) => rule.test(event) === true)) {
-            callback();
+            callback(event, toolkit);
         }
     };
 }
