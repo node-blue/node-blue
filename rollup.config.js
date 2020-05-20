@@ -1,32 +1,39 @@
 import commonjs from "@rollup/plugin-commonjs";
+import json from "@rollup/plugin-json";
 import resolve from "@rollup/plugin-node-resolve";
-import typescript from "@rollup/plugin-typescript";
-import babel from "@rollup/plugin-babel";
-
-import pkg from "./package.json";
 
 export default {
-    input: ["src/index.ts"],
-    output: [
-        {
-            file: pkg.main,
-            format: "cjs",
-        },
-        {
-            file: pkg.module,
-            format: "es",
-        },
-    ],
+    input: ["dist/src/index.js"],
+    output: {
+        file: "dist/index.js",
+        format: "cjs",
+        strict: false,
+        banner: "#!/usr/bin/env node",
+    },
     external: [
-        ...Object.keys(pkg.dependencies || {}),
-        ...Object.keys(pkg.peerDependencies || {}),
+        "bufferutil",
+        "child_process",
+        "crypto",
+        "events",
+        "fs",
+        "fsevents",
+        "http",
+        "https",
+        "net",
+        "os",
+        "path",
+        "stream",
+        "tls",
+        "utf-8-validate",
+        "util",
+        "url",
+        "zlib",
     ],
     plugins: [
-        commonjs(),
         resolve(),
-        typescript(),
-        babel({
-            exclude: "node_modules/**",
+        json(),
+        commonjs({
+            include: "node_modules/**",
         }),
     ],
 };

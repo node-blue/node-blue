@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
-import WebSocket = require("isomorphic-ws"); // ref: https://github.com/DefinitelyTyped/DefinitelyTyped/issues/36269
-import { MessageEvent } from "isomorphic-ws";
+import WebSocket, { MessageEvent } from "isomorphic-ws";
 
 import { collection } from "../util/collection";
 
