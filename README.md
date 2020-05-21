@@ -32,7 +32,7 @@ The CLI exposes the following options. All options may also be set by environmen
 | ------------- | --------------- | ------------------------------------------------------------------------- | ------- |
 | `-h, --host`  | `HASS_HOST`     | Specify your Home Assistant host                                          |         |
 | `-t, --token` | `HASS_TOKEN`    | Specify a long-lived access token for your Home Assistant instance        |         |
-| `p, --port`   | `HASS_PORT`     | Specify which port to use when connecting to your Home Assistant Instance | `8123`  |
+| `-p, --port`  | `HASS_PORT`     | Specify which port to use when connecting to your Home Assistant Instance | `8123`  |
 | `-s, --s`     | `HASS_SECURE`   | Connect to Home Assistant using the `wss` protocol                        | `false` |
 
 ### `nodes`
