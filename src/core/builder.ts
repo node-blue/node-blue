@@ -1,6 +1,8 @@
+import debounce from "lodash.debounce";
+
 import { StateChangedEvent } from "./homeassistant";
 import { Rule, EqualsRule, FieldChangedRule } from "./rule";
-import { HomeAssistantToolkit } from "./helpers";
+import { HomeAssistantToolkit } from "./toolkit";
 
 const ERR_NO_FURTHER_RULES = (field: string) =>
     `Ignoring call of \`${field}\` as no further rules are allowed. Most likely, you passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
@@ -15,11 +17,19 @@ export type HomeAssistantStateEventHandler = (
     toolkit: HomeAssistantToolkit
 ) => void;
 
+interface Cancelable {
+    cancel(): void;
+}
+
+export type DebouncedHomeAssistantStateEventHandler = HomeAssistantStateEventHandler &
+    Cancelable;
+
 export class Builder {
     public and = this; // TODO: allow multiple chains
 
-    private rules: Rule[] = [];
     private allowNewRules: boolean = true;
+    private rules: Rule[] = [];
+    private timeout: number = 0;
 
     constructor(rules?: Rule[], allowNewRules: boolean = true) {
         if (rules) this.rules = rules;
@@ -106,18 +116,33 @@ export class Builder {
             return this;
         }
 
-        // TODO: implement
-        console.log(value, unit);
+        switch (unit) {
+            case "seconds":
+                this.timeout = value * 1000;
+                break;
+            case "minutes":
+                this.timeout = value * 1000 * 60;
+                break;
+            case "hours":
+                this.timeout = value * 1000 * 60 * 60;
+                break;
+            case "milliseconds":
+            default:
+                this.timeout = value;
+                break;
+        }
 
         return this;
     };
 
-    do = (callback: NodeCallback): HomeAssistantStateEventHandler => (
-        event,
-        toolkit
-    ) => {
-        if (this.rules.every((rule) => rule.test(event) === true)) {
-            callback(event, toolkit);
-        }
-    };
+    do = (callback: NodeCallback): DebouncedHomeAssistantStateEventHandler =>
+        debounce<HomeAssistantStateEventHandler>((event, toolkit) => {
+            const allRulesEvaluateToTrue = this.rules.every(
+                (rule) => rule.test(event) === true
+            );
+
+            if (allRulesEvaluateToTrue) {
+                callback(event, toolkit);
+            }
+        }, this.timeout);
 }

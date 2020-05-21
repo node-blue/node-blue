@@ -6,8 +6,8 @@ import standard from "figlet/importable-fonts/Standard";
 import path from "path";
 
 import { description, name, version } from "../package.json";
-import { HomeAssistantStateEventHandler } from "./core/builder";
-import { createToolkit } from "./core/helpers";
+import { DebouncedHomeAssistantStateEventHandler } from "./core/builder";
+import { createToolkit } from "./core/toolkit";
 import { connect, StateChangedEvent } from "./core/homeassistant";
 import { when } from "./core/when";
 
@@ -67,7 +67,9 @@ program
             .then((hass) => {
                 console.log("Connected to Home Assistant!");
 
-                const handlers = collection<HomeAssistantStateEventHandler>({});
+                const handlers = collection<
+                    DebouncedHomeAssistantStateEventHandler
+                >({});
                 const toolkit = createToolkit(hass);
                 const watcher = watch(path.join(process.cwd(), nodes));
 
@@ -99,6 +101,7 @@ program
                     (event: StateChangedEvent) => {
                         handlers.forEach((handler) => {
                             try {
+                                handler.cancel();
                                 handler(event, toolkit);
                             } catch (error) {
                                 console.error(error);
