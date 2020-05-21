@@ -3,11 +3,12 @@
     "version": "0.1.0",
     "description": "Node automation engine for Home Assistant",
     "main": "dist/index.js",
+    "module": "dist/index.es.js",
     "bin": {
         "node-blue": "dist/index.js"
     },
     "files": [
-        "dist/index.js"
+        "dist"
     ],
     "repository": "git@github.com:nielsrowinbik/node-blue.git",
     "author": "Niels Bik <hey@nielsbik.nl>",
@@ -16,32 +17,33 @@
         "chokidar": "^3.4.0",
         "commander": "^5.1.0",
         "dotenv": "^8.2.0",
+        "figlet": "^1.4.0",
         "isomorphic-ws": "^4.0.1",
         "lodash.debounce": "^4.0.8",
         "lodash.get": "^4.4.2",
         "ws": "^7.3.0"
     },
     "devDependencies": {
-        "@babel/core": "^7.9.6",
-        "@rollup/plugin-babel": "^5.0.0",
-        "@rollup/plugin-commonjs": "^11.1.0",
         "@rollup/plugin-json": "^4.0.3",
         "@rollup/plugin-node-resolve": "^7.1.3",
         "@rollup/plugin-typescript": "^4.1.1",
+        "@types/figlet": "^1.2.0",
         "@types/lodash.debounce": "^4.0.6",
         "@types/lodash.get": "^4.4.6",
         "@types/node": "^14.0.4",
         "@types/ws": "^7.2.4",
-        "nodemon": "^2.0.4",
         "rollup": "^2.10.2",
-        "ts-node": "^8.10.1",
+        "rollup-plugin-commonjs": "^10.1.0",
         "tslib": "^2.0.0",
         "typescript": "^3.9.3"
     },
+    "optionalDependencies": {
+        "bufferutil": "^4.0.1",
+        "utf-8-validate": "^5.0.2"
+    },
     "scripts": {
-        "build:bundle": "rollup -c",
-        "build:tsc": "tsc",
-        "build": "npm run build:tsc && npm run build:bundle",
-        "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts --nodes '.test'"
+        "build": "rollup -c",
+        "dev": "rollup -cw",
+        "start": "npm run build && node-blue start .test --host 192.168.1.3"
     }
 }

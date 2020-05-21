@@ -4,13 +4,108 @@ Write your automations for Home Assistant in JavaScript using a modern, intuitiv
 
 ## Installation
 
-Currently, this is a barebones node application. In the future, this may expose a CLI, and will evolve into providing a Hass.io Add-on.
+Node-BLUE requires Node.js version 12 or above. To install, run the following command from any directory in your terminal:
 
-For now, the only method of installation that is supported is the same method through which you would contribute.
+```sh
+$ npm i -g node-blue
+```
+
+## Usage
+
+Installing the CLI globally provides access to the `node-blue` command.
+
+```sh
+$ node-blue [command]
+
+# Run `help` for detailed information about the CLI
+$ node-blue help
+
+# Run `start` to start the main application
+$ node-blue start
+```
+
+By default, Node-BLUE will watch for so called "nodes" in the `nodes` folder within the folder where `node-blue` is called from.
+
+### Nodes
+
+A "node" is an entity that contains a set of rules which, when evaluated, result in a function being called. Each node is to export
+a single function, which is passed the `when` object. This function should return an event handler. It is stronly advised to use the
+`when` object to construct this handler.
+
+```js
+exports.node = (when) => when('light.living_room).changes('state').do(() => {
+    console.log("light.living_room's state just changed!);
+});
+```
+
+### `when`
+
+The `when` object makes up most of Node-BLUE's API. Consider the following use cases:
+
+```js
+// Do something for every single change on the provided entity:
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .do(() => {
+            console.log("One of light.living_room's attributes has changed!");
+        });
+
+// Do something for every single state change on the provided entity:
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .state()
+        .do(() => {
+            console.log("light.living_room's state has changed!");
+        });
+
+// Do something only when the entity changes to the provided state:
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .to("on")
+        .do(() => {
+            console.log("light.living_room has changed to 'on'!");
+        });
+
+// Do something only when the entity changes from a provided state
+// into another provided state:
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .from("off")
+        .to("on")
+        .do(() => {
+            console.log("light.living_room has changed from 'off' to 'on'!");
+        });
+
+// Do something 5 seconds after the provided entity has changed to
+// the provided state:
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .to("on")
+        .for(5, "seconds")
+        .do(() => {
+            console.log("light.living_room turned on five seconds ago!");
+        });
+
+// Or, write your own implementation:
+exports.node = (when) =>
+    when(() => {
+        // Do whatever you want...
+        // ...
+        // Just remember to return `true` or `false`
+        return true;
+    }).do(() => {
+        console.log("when the code evaluates to true, this is executed!");
+    });
+```
 
 ## Development
 
-1. Get the source code and install dependencies
+1. Get the source code and install dependencies:
 
 ```sh
 $ git clone https://github.com/node-blue/node-blue
@@ -18,108 +113,22 @@ $ cd node-blue
 $ npm i
 ```
 
-2. Create a `.env` file containing the following:
-
-```
-HASS_URL=<your home assistant url>
-HASS_TOKEN=<a long-lived access token>
-```
-
-3. Build and link the application:
+2. Build and run:
 
 ```sh
-$ npm run build
-$ npm link
+$ npm start
 ```
 
-4. Create a different project in a separate folder and link `node-blue` as a dependency:
+By default, in development, nodes are read from the `.test` folder.
 
-```sh
-$ cd ../ # from the node-blue folder whe just cloned the repo into
-$ mkdir node-blue-test
-$ cd node-blue-test
-$ npm init -y
-$ npm link node-blue
-```
+Alternatively, you could run `npm run build` in one terminal, and directly use the CLI in another.
 
-5. Create an `index.js` importing the library and use it:
+## TODO
 
-```js
-const when = require("node-blue");
-
-// Use the application, see usage examples
-```
-
-6. Run your application:
-
-```sh
-$ node index.js
-```
-
-## Usage
-
-Consider the following usage examples:
-
-```js
-// Do something for every single change on the provided entity:
-when("light.living_room")
-    .changes()
-    .do(() => {
-        console.log("One of light.living_room's attributes has changed!");
-    });
-
-// Do something for every single state change on the provided entity:
-when("light.living_room")
-    .changes()
-    .state()
-    .do(() => {
-        console.log("light.living_room's state has changed!");
-    });
-
-// Do something only when the entity changes to the provided state:
-when("light.living_room")
-    .changes()
-    .to("on")
-    .do(() => {
-        console.log("light.living_room has changed to 'on'!");
-    });
-
-// Do something only when the entity changes from a provided state
-// into another provided state:
-when("light.living_room")
-    .changes()
-    .from("off")
-    .to("on")
-    .do(() => {
-        console.log("light.living_room has changed from 'off' to 'on'!");
-    });
-
-// Do something 5 seconds after the provided entity has changed to
-// the provided state:
-when("light.living_room")
-    .changes()
-    .to("on")
-    .for(5, "seconds")
-    .do(() => {
-        console.log("light.living_room turned on five seconds ago!");
-    });
-
-// Or, write your own implementation:
-when(() => {
-    // Do whatever you want...
-    // ...
-    // Just remember to return `true` or `false`
-    return true;
-}).do(() => {
-    console.log("when the code evaluates to true, this is executed!");
-});
-```
-
-## Roadmap / todo
-
--   [ ] Exporting typescript declarations
--   [x] Rewrite Home Assistant communication layer
--   [ ] Expose a CLI
--   [ ] Provide toolkit in callback to actually interact with Home Assistant
--   [ ] Read from files (through CLI)
--   [ ] Hass.io Add-on
+-   [ ] Improve development experience with auto-reloading
+-   [ ] Release first version and publish to NPM
+-   [ ] Handle newly added, updated, or changed nodes at runtime
+-   [ ] Improve typing throughout
+-   [ ] Generate and export type declarations
+-   [ ] Handle errors more gracefully
+-   [ ] Add some colour to the CLI's output?

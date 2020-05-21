@@ -59,7 +59,6 @@ interface Options {
     port: number;
     protocol: "ws" | "wss";
     token: string;
-    ws: (options: Options) => WebSocket;
 }
 
 let messageId = 1;
@@ -69,10 +68,6 @@ const defaultOptions = {
     port: 8123,
     protocol: "ws",
     token: "",
-    ws: (options: Options) =>
-        new WebSocket(
-            `${options.protocol}://${options.host}:${options.port}${options.path}`
-        ),
 };
 const pending = collection<any>({}); // TODO: Add typing
 const subscriptions = collection<any>({}); // TODO: Add typing
@@ -195,7 +190,9 @@ export const connect = (callerOptions: Partial<Options> = {}) =>
             ...callerOptions,
         };
         const emitter = new EventEmitter();
-        const ws = options.ws(options);
+        const ws = new WebSocket(
+            `${options.protocol}://${options.host}:${options.port}${options.path}`
+        );
 
         const errorHandler = (error: any) => reject(new Error(error.message));
 
