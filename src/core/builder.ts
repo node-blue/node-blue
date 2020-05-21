@@ -107,7 +107,7 @@ export class Builder {
     // true:
     for = (
         value: number,
-        unit: "milliseconds" | "seconds" | "minutes" | "hours"
+        unit?: "milliseconds" | "seconds" | "minutes" | "hours"
     ) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
