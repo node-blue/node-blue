@@ -13,8 +13,9 @@ export interface HomeAssistantClient {
         service: string,
         additionalArguments?: { [key: string]: any }
     ) => Promise<void>;
+    getStates: () => Promise<HomeAssistantEntity[]>;
     removeEventListener: (eventName: string) => Promise<void>;
-    sendCommand: (commandArgs?: object) => void;
+    sendCommand: (commandArgs?: object) => Promise<any>;
 }
 export type HomeAssistantEventCallback = (...args: any[]) => void;
 export type HomeAssistantEntity = {
@@ -118,6 +119,11 @@ const getClient = (emitter: EventEmitter, ws: WebSocket) => {
             service_data: additionalArguments,
         });
 
+    const getStates = () =>
+        sendCommand(ws)({
+            type: "get_states",
+        });
+
     const removeEventListener = async (eventName: string) => {
         try {
             const subscription = subscriptions.findById(eventName);
@@ -136,6 +142,7 @@ const getClient = (emitter: EventEmitter, ws: WebSocket) => {
     return {
         addEventListener,
         callService,
+        getStates,
         removeEventListener,
         sendCommand: sendCommand(ws),
     };
