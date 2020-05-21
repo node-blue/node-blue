@@ -12,10 +12,10 @@ export interface HomeAssistantClient {
         domain: string,
         service: string,
         additionalArguments?: { [key: string]: any }
-    ) => Promise<void>;
+    ) => Promise<null>;
     getStates: () => Promise<HomeAssistantEntity[]>;
     removeEventListener: (eventName: string) => Promise<void>;
-    sendCommand: (commandArgs?: object) => Promise<any>;
+    sendCommand: <T>(commandArgs?: object) => Promise<T>;
 }
 export type HomeAssistantEventCallback = (...args: any[]) => void;
 export type HomeAssistantEntity = {
@@ -39,18 +39,41 @@ export type HomeAssistantEntity = {
         user_id: string | null;
     };
 };
-export type StateChangedEvent = {
-    event_type: "state_changed";
-    data: {
-        entity_id: string;
-        old_state: HomeAssistantEntity | null;
-        new_state: HomeAssistantEntity | null;
+export type HomeAssistantMessageBase = {
+    id?: number;
+    type: string;
+    [key: string]: any;
+};
+export type HomeAssistantResultMessage<T> = HomeAssistantMessageBase & {
+    type: "result";
+    success: boolean;
+    result?: T | null;
+    error?: {
+        code: 1 | 2 | 3;
+        message: string;
     };
-    origin: string;
-    context: {
-        id: string;
-        parent_id: string | null;
-        user_id: string | null;
+};
+export type HomeAssistantResultHandler<T> = (
+    result: HomeAssistantResultMessage<T>
+) => void;
+export type HomeAssistantEvent = HomeAssistantMessageBase & {
+    type: "event";
+    event: {
+        data: object;
+        event_type: string;
+        time_fired: string;
+        origin: string;
+        [key: string]: any;
+    };
+};
+export type StateChangedEvent = HomeAssistantEvent & {
+    event: {
+        data: {
+            entity_id: string;
+            old_state: HomeAssistantEntity | null;
+            new_state: HomeAssistantEntity | null;
+        };
+        event_type: "state_changed";
     };
 };
 
@@ -70,8 +93,8 @@ const defaultOptions = {
     protocol: "ws",
     token: "",
 };
-const pending = collection<any>({}); // TODO: Add typing
-const subscriptions = collection<any>({}); // TODO: Add typing
+const pending = collection<HomeAssistantResultHandler<any>>({});
+const subscriptions = collection<HomeAssistantResultMessage<null>>({});
 
 const authHandler = (ws: WebSocket, token: string) => () => {
     if (!token || token === "") {
@@ -88,13 +111,16 @@ const authHandler = (ws: WebSocket, token: string) => () => {
     ws.send(JSON.stringify(message));
 };
 
-const getClient = (emitter: EventEmitter, ws: WebSocket) => {
+const getClient = (
+    emitter: EventEmitter,
+    ws: WebSocket
+): HomeAssistantClient => {
     const addEventListener = async (
         eventName: string,
         callback: HomeAssistantEventCallback
     ) => {
         try {
-            const subscription = await sendCommand(ws)({
+            const subscription = await sendCommand(ws)<null>({
                 type: "subscribe_events",
                 event_type: eventName,
             });
@@ -112,7 +138,7 @@ const getClient = (emitter: EventEmitter, ws: WebSocket) => {
         service: string,
         additionalArguments: { [key: string]: any } = {}
     ) =>
-        sendCommand(ws)({
+        sendCommand(ws)<null>({
             type: "call_service",
             domain,
             service,
@@ -120,7 +146,7 @@ const getClient = (emitter: EventEmitter, ws: WebSocket) => {
         });
 
     const getStates = () =>
-        sendCommand(ws)({
+        sendCommand(ws)<HomeAssistantEntity[]>({
             type: "get_states",
         });
 
@@ -149,7 +175,9 @@ const getClient = (emitter: EventEmitter, ws: WebSocket) => {
 };
 
 const messageHandler = (emitter: EventEmitter) => (wsMessage: MessageEvent) => {
-    const message = JSON.parse(wsMessage.data.toString());
+    const message:
+        | HomeAssistantResultMessage<unknown>
+        | HomeAssistantEvent = JSON.parse(wsMessage.data.toString());
 
     // Emit an event for any message of any type:
     if (message.type) emitter.emit(message.type, message);
@@ -162,16 +190,18 @@ const messageHandler = (emitter: EventEmitter) => (wsMessage: MessageEvent) => {
     // handler:
     if (message.id && message.type === "result") {
         try {
-            pending.findById(message.id)(message);
+            pending.findById(message.id.toString())(message);
         } catch (error) {
             // No handler exists, fail silently
         }
     }
 };
 
-const sendCommand = (ws: WebSocket) => (commandArgs: object = {}) =>
-    new Promise<any>((resolve, reject) => {
-        const resultHandler = (result: any) => {
+const sendCommand = (ws: WebSocket) => <T>(commandArgs: object = {}) =>
+    new Promise<T>((resolve, reject) => {
+        const resultHandler: HomeAssistantResultHandler<T> = (
+            result: HomeAssistantResultMessage<T>
+        ) => {
             if (result.success) resolve(result.result);
             else reject(new Error(result.error.message));
 

@@ -226,7 +226,6 @@ All of the scripts above configure the CLI to read from the `.test` folder inste
 ## TODO
 
 -   [ ] Handle newly added, updated, or changed nodes at runtime
--   [ ] Improve typing throughout
 -   [ ] Generate and export type declarations
 -   [ ] Handle errors more gracefully
 -   [ ] Add some colour to the CLI's output?
