@@ -114,7 +114,147 @@ exports.node = (when) =>
 
 ## API
 
-TODO: write API documentation.
+### `when`
+
+#### Arguments
+
+`when` takes a single argument, either:
+
+-   a `string`, representing a Home Assistant `entity_id`, or
+-   a `function`, in which the user writes their own logic to determine whether the automation should run
+
+Note that if a function is passed:
+
+-   it to return a `boolean`, and
+-   no further filtering is possible. After passing a function into `when`, the next call should be `do()`.
+
+The function passed into `when` will be called with two arguments:
+
+-   `event`, the raw event from Home Assistant to determine whether to react to or not, and
+-   `toolkit`, a collection of tools to interact with the connected Home Assistant instance.
+
+#### Examples
+
+```js
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .do(() => {
+            // Called when any of `light.living_room`'s attributes change
+        });
+
+// For more information on the `for` and `do`calls, please refer to their respective documentation
+```
+
+```js
+exports.node = (when) =>
+    when((event, toolkit) => {
+        // Do whatever, just remember to return a `boolean`
+        return true;
+    }).do(() => {
+        // This is called because `true` was returned!
+    });
+```
+
+### `changes`
+
+#### Arguments
+
+`changes` takes one optional argument:
+
+-   a `string`, representing a dot-notated path to the field within the entity specified in `when` has to be changed.
+
+#### Examples
+
+```js
+exports.node = (when) =>
+    when("light.living_room")
+        .changes()
+        .do(() => {
+            // Called when any of `light.living_room`'s attributes change
+        });
+```
+
+```js
+exports.node = (when) =>
+    when("light.living_room")
+        .changes("state")
+        .do(() => {
+            // Called when `light.living_room`'s state changes
+        });
+```
+
+### `from`
+
+#### Arguments
+
+`from` takes a single required argument and an optional second argument:
+
+-   a `string` representing the value that the entity should have changed _from_, and
+-   an optional `string` representing a dot-notated path to the field within the entity passed into `when` that the value previously specified should have changed _from_. This option defaults to `state`.
+
+#### Examples
+
+```js
+exports.node = (when) =>
+    when("light.living_room")
+        .changes("state")
+        .from("off")
+        .do(() => {
+            // Called when light.living_room's state changes from "off" to a different value
+        });
+```
+
+### `to`
+
+#### Arguments
+
+`to` takes a single required argument and an optional second argument:
+
+-   a `string` representing the value that the entity should have changed _to_, and
+-   an optional `string` representing a dot-notated path to the field within the entity passed into `when` that the value previously specified should have changed _to_. This option defaults to `state`.
+
+#### Examples
+
+```js
+exports.node = (when) =>
+    when("light.living_room")
+        .changes("state")
+        .to("off")
+        .do(() => {
+            // Called when light.living_room's state changes to "off"
+        });
+```
+
+### `for`
+
+`for` is used to make sure a certain changes is persisted for a certain amount of time before calling `do`. It takes one required argument and an optional argument:
+
+-   a `number`, representing the size of the delay, and
+-   a `string`, representing the unit of the delay. Currently, the following units are supported: `milliseconds`, `seconds`, `minutes`, `hours`, with `milliseconds` being the default.
+
+### `do`
+
+`do` should always be the last thing you call. It takes a single required argument:
+
+-   a `function` that will be called of all of the previously specified rules (or the function you passed into `when`) evaluate to `true`.
+
+The function passed into `do` will be called with two arguments:
+
+-   `event`, the raw event from Home Assistant to determine whether to react to or not, and
+-   `toolkit`, a collection of tools to interact with the connected Home Assistant instance.
+
+### `event`
+
+Please refer to the [Home Assistant WebSocket API documentation](https://developers.home-assistant.io/docs/api/websocket/#subscribe-to-events).
+
+### `toolkit`
+
+The toolkit currently exposes the following functions:
+
+-   `callService`: Please refer to the [calling a service](https://developers.home-assistant.io/docs/api/websocket/#calling-a-service) section of the Home Assistant WebSocket API documentation.
+-   `entity`: Handy wrapper that takes an `entity_id` and returns the corresponding object or `undefined` if it does not exist.
+-   `states`: Please refer to the [fetching states](https://developers.home-assistant.io/docs/api/websocket/#fetching-states) section of the Home Assistant WebSocket API documentation.
 
 ## Development
 
