@@ -49,69 +49,6 @@ exports.node = (when) => when('light.living_room).changes('state').do(() => {
 });
 ```
 
-### Examples
-
-The following is just a subset of what's possible. Please refer to the API definition to learn about the possibilities in more detail.
-
-```js
-// Do something for every single change on the provided entity:
-exports.node = (when) =>
-    when("light.living_room")
-        .changes()
-        .do(() => {
-            console.log("One of light.living_room's attributes has changed!");
-        });
-
-// Do something for every single state change on the provided entity:
-exports.node = (when) =>
-    when("light.living_room")
-        .changes()
-        .state()
-        .do(() => {
-            console.log("light.living_room's state has changed!");
-        });
-
-// Do something only when the entity changes to the provided state:
-exports.node = (when) =>
-    when("light.living_room")
-        .changes()
-        .to("on")
-        .do(() => {
-            console.log("light.living_room has changed to 'on'!");
-        });
-
-// Do something only when the entity changes from a provided state
-// into another provided state:
-exports.node = (when) =>
-    when("light.living_room")
-        .changes()
-        .from("off")
-        .to("on")
-        .do(() => {
-            console.log("light.living_room has changed from 'off' to 'on'!");
-        });
-
-// Do something 5 seconds after the provided entity has changed to
-// the provided state:
-exports.node = (when) =>
-    when("light.living_room")
-        .changes()
-        .to("on")
-        .for(5, "seconds")
-        .do(() => {
-            console.log("light.living_room turned on five seconds ago!");
-        });
-
-// Or, write your own implementation:
-exports.node = (when) =>
-    when(() => {
-        // Do whatever you want...
-        return true;
-    }).do(() => {
-        console.log("when the code evaluates to true, this is executed!");
-    });
-```
-
 ## API
 
 ### `when`
@@ -288,7 +225,6 @@ All of the scripts above configure the CLI to read from the `.test` folder inste
 
 ## TODO
 
--   [ ] Release first version and publish to NPM
 -   [ ] Handle newly added, updated, or changed nodes at runtime
 -   [ ] Improve typing throughout
 -   [ ] Generate and export type declarations
