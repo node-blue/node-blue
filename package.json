@@ -1,5 +1,5 @@
 {
-    "name": "node-blue",
+    "name": "@node-blue/node-blue",
     "version": "0.1.0",
     "description": "Node automation engine for Home Assistant",
     "main": "dist/index.js",
@@ -10,9 +10,9 @@
     "files": [
         "dist"
     ],
-    "repository": "git@github.com:nielsrowinbik/node-blue.git",
+    "repository": "git@github.com:node-blue/node-blue.git",
     "author": "Niels Bik <hey@nielsbik.nl>",
-    "license": "MIT",
+    "license": "Apache-2.0",
     "dependencies": {
         "chokidar": "^3.4.0",
         "commander": "^5.1.0",
@@ -49,5 +49,8 @@
         "dev": "nodemon --exec 'node-blue start .test'",
         "start": "npm run build && node-blue start .test",
         "test": "echo \"No test specified\""
+    },
+    "publishConfig": {
+        "access": "public"
     }
 }
