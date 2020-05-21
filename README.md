@@ -21,16 +21,27 @@ $ node-blue [command]
 $ node-blue help
 
 # Run `start` to start the main application
-$ node-blue start
+$ node-blue start [nodes]
 ```
 
-By default, Node-BLUE will watch for so called "nodes" in the `nodes` folder within the folder where `node-blue` is called from.
+`node-blue start` takes a single argument of a path to a directory Node-BLUE should watch for `nodes`. By default `./nodes` is used.
 
-### Nodes
+The CLI exposes the following options. All options may also be set by environment variables. CLI options take precedence over environment variables.
+
+| CLI option    | .env equivalent | details                                                                   | default |
+| ------------- | --------------- | ------------------------------------------------------------------------- | ------- |
+| `-h, --host`  | `HASS_HOST`     | Specify your Home Assistant host                                          |         |
+| `-t, --token` | `HASS_TOKEN`    | Specify a long-lived access token for your Home Assistant instance        |         |
+| `p, --port`   | `HASS_PORT`     | Specify which port to use when connecting to your Home Assistant Instance | `8123`  |
+| `-s, --s`     | `HASS_SECURE`   | Connect to Home Assistant using the `wss` protocol                        | `false` |
+
+### `nodes`
 
 A "node" is an entity that contains a set of rules which, when evaluated, result in a function being called. Each node is to export
 a single function, which is passed the `when` object. This function should return an event handler. It is stronly advised to use the
 `when` object to construct this handler.
+
+Your `node` files should look like this:
 
 ```js
 exports.node = (when) => when('light.living_room).changes('state').do(() => {
@@ -38,9 +49,9 @@ exports.node = (when) => when('light.living_room).changes('state').do(() => {
 });
 ```
 
-### `when`
+### Examples
 
-The `when` object makes up most of Node-BLUE's API. Consider the following use cases:
+The following is just a subset of what's possible. Please refer to the API definition to learn about the possibilities in more detail.
 
 ```js
 // Do something for every single change on the provided entity:
@@ -95,17 +106,19 @@ exports.node = (when) =>
 exports.node = (when) =>
     when(() => {
         // Do whatever you want...
-        // ...
-        // Just remember to return `true` or `false`
         return true;
     }).do(() => {
         console.log("when the code evaluates to true, this is executed!");
     });
 ```
 
+## API
+
+TODO: write API documentation.
+
 ## Development
 
-1. Get the source code and install dependencies:
+First, get the source code and install dependencies:
 
 ```sh
 $ git clone https://github.com/node-blue/node-blue
@@ -113,22 +126,32 @@ $ cd node-blue
 $ npm i
 ```
 
-2. Build and run:
+Then, watch for changes and have the CLI rebuild and restart accordingly (recommended):
+
+```sh
+# In one terminal:
+$ npm run build:watch
+
+# In another:
+$ npm run dev
+```
+
+Alternatively, build and run once:
 
 ```sh
 $ npm start
 ```
 
-By default, in development, nodes are read from the `.test` folder.
+Or run `npm run build` yourself and use the CLI afterwards.
 
-Alternatively, you could run `npm run build` in one terminal, and directly use the CLI in another.
+All of the scripts above configure the CLI to read from the `.test` folder instead of the usual default.
 
 ## TODO
 
--   [ ] Improve development experience with auto-reloading
 -   [ ] Release first version and publish to NPM
 -   [ ] Handle newly added, updated, or changed nodes at runtime
 -   [ ] Improve typing throughout
 -   [ ] Generate and export type declarations
 -   [ ] Handle errors more gracefully
 -   [ ] Add some colour to the CLI's output?
+-   [ ] Get to doing those todo's in the code

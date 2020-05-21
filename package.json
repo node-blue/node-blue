@@ -21,6 +21,7 @@
         "isomorphic-ws": "^4.0.1",
         "lodash.debounce": "^4.0.8",
         "lodash.get": "^4.4.2",
+        "nodemon": "^2.0.4",
         "ws": "^7.3.0"
     },
     "devDependencies": {
@@ -43,7 +44,8 @@
     },
     "scripts": {
         "build": "rollup -c",
-        "dev": "rollup -cw",
-        "start": "npm run build && node-blue start .test --host 192.168.1.3"
+        "build:watch": "rollup -cw",
+        "dev": "nodemon --exec 'node-blue start .test'",
+        "start": "npm run build && node-blue start .test"
     }
 }

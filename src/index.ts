@@ -24,8 +24,7 @@ console.log(figlet.textSync(name));
 
 program.option(
     "-h, --host <home_assistant_host>",
-    "specify your Home Assistant host",
-    "hassio.local"
+    "specify your Home Assistant host"
 );
 
 program.option(
@@ -52,13 +51,16 @@ program
         console.log(`Starting ${name}...`);
 
         const { host, port, secure, token } = program;
-        const protocol = secure === undefined ? "ws" : "wss";
+        const protocol =
+            secure === undefined && process.env.HASS_SECURE === undefined
+                ? "ws"
+                : "wss";
 
         console.log("Connecting to Home Assistant...");
 
         connect({
-            host,
-            port,
+            host: host || process.env.HASS_HOST,
+            port: port || process.env.HASS_PORT,
             protocol,
             token: token || process.env.HASS_TOKEN,
         })
