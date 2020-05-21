@@ -47,6 +47,7 @@
         "build": "rollup -c",
         "build:watch": "rollup -cw",
         "dev": "nodemon --exec 'node-blue start .test'",
+        "release": "np",
         "start": "npm run build && node-blue start .test",
         "test": "echo \"No test specified\""
     },
