@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import get from "lodash.get";
+import { get } from "lodash";
 
 import { StateChangedEvent } from "./homeassistant";
 

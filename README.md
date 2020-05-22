@@ -26,7 +26,7 @@ $ node-blue start [nodes]
 
 `node-blue start` takes a single argument of a path to a directory Node-BLUE should watch for `nodes`. By default `./nodes` is used.
 
-The CLI exposes the following options. All options may also be set by environment variables. CLI options take precedence over environment variables.
+`node-blue start` accepts the following options. All options may also be set by environment variables. CLI options take precedence over environment variables.
 
 | CLI option    | .env equivalent | details                                                                   | default |
 | ------------- | --------------- | ------------------------------------------------------------------------- | ------- |
@@ -44,9 +44,12 @@ a single function, which is passed the `when` object. This function should retur
 Your `node` files should look like this:
 
 ```js
-exports.node = (when) => when('light.living_room).changes('state').do(() => {
-    console.log("light.living_room's state just changed!);
-});
+exports.node = (when, toolkit) =>
+    when("light.living_room")
+        .changes("state")
+        .do((event) => {
+            console.log("light.living_room's state just changed!");
+        });
 ```
 
 ## API
@@ -85,7 +88,7 @@ exports.node = (when) =>
 
 ```js
 exports.node = (when) =>
-    when((event, toolkit) => {
+    when((event) => {
         // Do whatever, just remember to return a `boolean`
         return true;
     }).do(() => {
@@ -187,9 +190,9 @@ Please refer to the [Home Assistant WebSocket API documentation](https://develop
 
 ### `toolkit`
 
-The toolkit currently exposes the following functions:
+The toolkit is passed into the exposed function right after `when`. It currently exposes the following functions:
 
--   `callService`: Please refer to the [calling a service](https://developers.home-assistant.io/docs/api/websocket/#calling-a-service) section of the Home Assistant WebSocket API documentation.
+-   `diff`: Generate a difference report between the old state and the new state by passing it the event.
 -   `entity`: Handy wrapper that takes an `entity_id` and returns the corresponding object or `undefined` if it does not exist.
 -   `states`: Please refer to the [fetching states](https://developers.home-assistant.io/docs/api/websocket/#fetching-states) section of the Home Assistant WebSocket API documentation.
 
@@ -225,7 +228,6 @@ All of the scripts above configure the CLI to read from the `.test` folder inste
 
 ## TODO
 
--   [ ] Handle newly added, updated, or changed nodes at runtime
 -   [ ] Generate and export type declarations
 -   [ ] Handle errors more gracefully
 -   [ ] Add some colour to the CLI's output?

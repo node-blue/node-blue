@@ -1,23 +1,9 @@
 import { EventEmitter } from "events";
-import WebSocket, { MessageEvent } from "isomorphic-ws";
+import WebSocket from "isomorphic-ws";
+import { getDiff, rdiffResult } from "recursive-diff";
 
-import { collection } from "../util/collection";
+let messageId = 1;
 
-export interface HomeAssistantClient {
-    addEventListener: (
-        eventName: string,
-        callback: HomeAssistantEventCallback
-    ) => Promise<EventEmitter>;
-    callService: (
-        domain: string,
-        service: string,
-        additionalArguments?: { [key: string]: any }
-    ) => Promise<null>;
-    getStates: () => Promise<HomeAssistantEntity[]>;
-    removeEventListener: (eventName: string) => Promise<void>;
-    sendCommand: <T>(commandArgs?: object) => Promise<T>;
-}
-export type HomeAssistantEventCallback = (...args: any[]) => void;
 export type HomeAssistantEntity = {
     entity_id: string;
     state: string;
@@ -39,24 +25,25 @@ export type HomeAssistantEntity = {
         user_id: string | null;
     };
 };
-export type HomeAssistantMessageBase = {
+
+export type HomeAssistantMessage = {
     id?: number;
-    type: string;
+    type: "auth_invalid" | "auth_ok" | "auth_required" | "event" | "result";
     [key: string]: any;
 };
-export type HomeAssistantResultMessage<T> = HomeAssistantMessageBase & {
+
+export type HomeAssistantResult<T = null> = HomeAssistantMessage & {
+    id: number;
     type: "result";
     success: boolean;
-    result?: T | null;
+    result?: T;
     error?: {
         code: 1 | 2 | 3;
         message: string;
     };
 };
-export type HomeAssistantResultHandler<T> = (
-    result: HomeAssistantResultMessage<T>
-) => void;
-export type HomeAssistantEvent = HomeAssistantMessageBase & {
+
+export type HomeAssistantEvent = HomeAssistantMessage & {
     type: "event";
     event: {
         data: object;
@@ -66,180 +53,242 @@ export type HomeAssistantEvent = HomeAssistantMessageBase & {
         [key: string]: any;
     };
 };
-export type StateChangedEvent = HomeAssistantEvent & {
-    event: {
-        data: {
-            entity_id: string;
-            old_state: HomeAssistantEntity | null;
-            new_state: HomeAssistantEntity | null;
-        };
-        event_type: "state_changed";
+
+export type StateChangedEvent = {
+    data: {
+        entity_id: string;
+        old_state: HomeAssistantEntity | null;
+        new_state: HomeAssistantEntity | null;
     };
+    event_type: "state_changed";
 };
 
-interface Options {
+export type HomeAssistantClient = {
+    addEventListener: (
+        event_type: string,
+        callback: (event: HomeAssistantEvent) => void
+    ) => EventEmitter;
+    emitter: EventEmitter;
+};
+export type HomeAssistantToolkit = {
+    diff: (event: StateChangedEvent) => rdiffResult[];
+    entity: (entity_id: string) => Promise<HomeAssistantEntity>;
+    states: () => Promise<HomeAssistantEntity[]>;
+};
+
+const createHomeAssistantClientAndToolkit = ({
+    emitter,
+    ws,
+}: {
+    emitter: EventEmitter;
+    ws: { send: (data: any) => void };
+}): [HomeAssistantClient, HomeAssistantToolkit] => {
+    const once = <T = unknown>(event: string) =>
+        new Promise<T>((resolve) =>
+            emitter.once(event, (message: HomeAssistantResult) =>
+                resolve(message.result)
+            )
+        );
+
+    const addEventListener = (
+        event_type: string,
+        callback: (event: HomeAssistantEvent) => void
+    ) => {
+        // Only subscribe if user wants to listen to an even other than state changes:
+        if (event_type !== "state_changed") {
+            const id = messageId;
+            ws.send({ id, type: "subscribe_events", event_type });
+        }
+
+        // Return a listener:
+        return emitter.on(event_type, callback);
+    };
+
+    const states = async (): Promise<HomeAssistantEntity[]> => {
+        const id = messageId;
+        ws.send({ id, type: "get_states" });
+        return once(`result_${id}`);
+    };
+
+    const entity = async (
+        entity_id: string
+    ): Promise<HomeAssistantEntity | undefined> => {
+        const entities = await states();
+        return entities.find((entity) => entity.entity_id === entity_id);
+    };
+
+    const diff = (event: StateChangedEvent) => {
+        const oldState = event.data.old_state;
+        const newState = event.data.new_state;
+
+        return getDiff(oldState, newState, true);
+    };
+
+    const client: HomeAssistantClient = {
+        addEventListener,
+        emitter,
+    };
+
+    const toolkit: HomeAssistantToolkit = {
+        diff,
+        entity,
+        states,
+    };
+
+    return [client, toolkit];
+};
+
+type WebSocketOptions = {
     host: string;
     path: string;
     port: number;
     protocol: "ws" | "wss";
-    token: string;
-}
+    onError?: (event: WebSocket.ErrorEvent) => void;
+    onMessage?: (
+        event: HomeAssistantMessage | HomeAssistantResult | HomeAssistantEvent
+    ) => void;
+};
 
-let messageId = 1;
-const defaultOptions = {
+const createWebsocket = ({
+    host,
+    path,
+    port,
+    protocol,
+    onError,
+    onMessage,
+}: WebSocketOptions) => {
+    const ws = new WebSocket(`${protocol}://${host}:${port}${path}`);
+
+    if (onError) ws.onerror = onError;
+    if (onMessage)
+        ws.onmessage = (message: WebSocket.MessageEvent) =>
+            onMessage(JSON.parse(message.data.toString()));
+
+    return {
+        send: (data: { [key: string]: any }) => {
+            ws.send(JSON.stringify(data));
+            messageId++;
+        },
+    };
+};
+
+type ConnectOptions = {
+    host: string;
+    path: string;
+    port: number;
+    protocol: "ws" | "wss";
+    token?: string;
+};
+
+const defaultOptions: ConnectOptions = {
     host: "hassio.local",
     path: "/api/websocket",
     port: 8123,
     protocol: "ws",
-    token: "",
 };
-const pending = collection<HomeAssistantResultHandler<any>>({});
-const subscriptions = collection<HomeAssistantResultMessage<null>>({});
 
-const authHandler = (ws: WebSocket, token: string) => () => {
-    if (!token || token === "") {
-        throw new Error(
-            "Home Assistant requires authentication, but no token was provided."
-        );
-    }
+export const connect = async (
+    callerOptions: Partial<ConnectOptions> = {}
+): Promise<[HomeAssistantClient, HomeAssistantToolkit]> => {
+    const emitter = new EventEmitter();
+    const event = (event: string) =>
+        new Promise((resolve) => emitter.once(event, resolve));
 
-    const message = {
-        type: "auth",
-        access_token: token,
+    // Combine provided options with defaults:
+    const {
+        host,
+        path,
+        port,
+        protocol,
+        token: access_token,
+    }: ConnectOptions = {
+        ...defaultOptions,
+        ...callerOptions,
     };
 
-    ws.send(JSON.stringify(message));
-};
+    // Create a handler for WebSocket errors:
+    const onError: WebSocketOptions["onError"] = (error) => {
+        throw new Error(error.message);
+    };
 
-const getClient = (
-    emitter: EventEmitter,
-    ws: WebSocket
-): HomeAssistantClient => {
-    const addEventListener = async (
-        eventName: string,
-        callback: HomeAssistantEventCallback
-    ) => {
-        try {
-            const subscription = await sendCommand(ws)<null>({
-                type: "subscribe_events",
-                event_type: eventName,
-            });
+    // Create a handler for WebSocket messages:
+    const onMessage: WebSocketOptions["onMessage"] = (message) => {
+        // Emit all messages received, as long as they have a `type`:
+        if (message.type) emitter.emit(message.type, message);
 
-            subscriptions.insert(subscription, eventName);
-        } catch (error) {
-            // Subscription already exists, fail silently
+        // Also emit specific events under their `event_type`:
+        if (message.type === "event") {
+            const { event } = message as HomeAssistantEvent;
+            const { event_type } = event;
+            if (event_type) emitter.emit(event_type, event);
         }
 
-        return emitter.on(eventName, callback);
-    };
-
-    const callService = (
-        domain: string,
-        service: string,
-        additionalArguments: { [key: string]: any } = {}
-    ) =>
-        sendCommand(ws)<null>({
-            type: "call_service",
-            domain,
-            service,
-            service_data: additionalArguments,
-        });
-
-    const getStates = () =>
-        sendCommand(ws)<HomeAssistantEntity[]>({
-            type: "get_states",
-        });
-
-    const removeEventListener = async (eventName: string) => {
-        try {
-            const subscription = subscriptions.findById(eventName);
-
-            await sendCommand(ws)({
-                type: "unsubscribe_events",
-                subscription: subscription.id,
-            });
-
-            subscriptions.remove(eventName);
-        } catch (error) {
-            console.warn("Something went wrong removing the subscription");
+        // Handle response messages by emitting a one-off event:
+        if (message.type === "result") {
+            const { id } = message as HomeAssistantResult;
+            emitter.emit(`result_${id}`, message);
         }
     };
 
-    return {
-        addEventListener,
-        callService,
-        getStates,
-        removeEventListener,
-        sendCommand: sendCommand(ws),
-    };
-};
-
-const messageHandler = (emitter: EventEmitter) => (wsMessage: MessageEvent) => {
-    const message:
-        | HomeAssistantResultMessage<unknown>
-        | HomeAssistantEvent = JSON.parse(wsMessage.data.toString());
-
-    // Emit an event for any message of any type:
-    if (message.type) emitter.emit(message.type, message);
-
-    // Emit an event for event-type messages:
-    if (message.type === "event" && message.event.event_type)
-        emitter.emit(message.event.event_type, message.event);
-
-    // If this is a result message, handle it using the stored
-    // handler:
-    if (message.id && message.type === "result") {
-        try {
-            pending.findById(message.id.toString())(message);
-        } catch (error) {
-            // No handler exists, fail silently
-        }
-    }
-};
-
-const sendCommand = (ws: WebSocket) => <T>(commandArgs: object = {}) =>
-    new Promise<T>((resolve, reject) => {
-        const resultHandler: HomeAssistantResultHandler<T> = (
-            result: HomeAssistantResultMessage<T>
-        ) => {
-            if (result.success) resolve(result.result);
-            else reject(new Error(result.error.message));
-
-            pending.remove(messageId.toString());
-        };
-        pending.insert(resultHandler, messageId.toString());
-
-        ws.send(
-            JSON.stringify({
-                ...commandArgs,
-                id: messageId,
-            })
-        );
-
-        messageId++;
+    // Create the WebSocket connection (this also starts the authentication flow):
+    const ws = createWebsocket({
+        host,
+        path,
+        port,
+        protocol,
+        onError,
+        onMessage,
     });
 
-export const connect = (callerOptions: Partial<Options> = {}) =>
-    new Promise<HomeAssistantClient>((resolve, reject) => {
-        // @ts-ignore
-        const options: Options = {
-            ...defaultOptions,
-            ...callerOptions,
-        };
-        const emitter = new EventEmitter();
-        const ws = new WebSocket(
-            `${options.protocol}://${options.host}:${options.port}${options.path}`
-        );
+    // Check if we need to log in:
+    const authRequired =
+        ((await Promise.race([
+            event("auth_ok"),
+            event("auth_required"),
+        ])) as HomeAssistantMessage).type === "auth_required";
 
-        const errorHandler = (error: any) => reject(new Error(error.message));
+    if (authRequired === true) {
+        // Home Assistant has concluded that we need to log in.
 
-        ws.onmessage = messageHandler(emitter);
-        ws.onerror = errorHandler;
+        // Throw if no token is provided:
+        if (!access_token) {
+            throw new Error("No access token provided");
+        }
 
-        emitter.on("auth_required", authHandler(ws, options.token));
-        emitter.on("auth_invalid", errorHandler);
-        emitter.on("auth_ok", () => {
-            const client: HomeAssistantClient = getClient(emitter, ws);
-            resolve(client);
+        // Throw if token is an empty string:
+        if (access_token === "") {
+            throw new Error("Access token cannnot be an empty string");
+        }
+
+        // A token has been provided, use it to authenticate with Home Assistant:
+        ws.send({
+            type: "auth",
+            access_token,
         });
+
+        // Check if we are successfully logged in:
+        const authOk =
+            ((await Promise.race([
+                event("auth_ok"),
+                event("auth_invalid"),
+            ])) as HomeAssistantMessage).type === "auth_ok";
+
+        if (authOk === false) {
+            // We received a 'auth_invalid' response, handle it by throwing:
+            throw new Error("Invalid access token or password");
+        }
+    }
+
+    // Subscribe to state events:
+    ws.send({
+        event_type: "state_changed",
+        id: messageId,
+        type: "subscribe_events",
     });
+
+    // Construct and return the Home Assistant client and toolkit objects:
+    return createHomeAssistantClientAndToolkit({
+        emitter,
+        ws,
+    });
+};

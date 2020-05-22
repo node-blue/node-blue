@@ -1,28 +1,20 @@
-import debounce from "lodash.debounce";
+import { debounce } from "lodash";
 
-import { StateChangedEvent } from "./homeassistant";
+import { HomeAssistantToolkit, StateChangedEvent } from "./homeassistant";
 import { Rule, EqualsRule, FieldChangedRule } from "./rule";
-import { HomeAssistantToolkit } from "./toolkit";
 
 const ERR_NO_FURTHER_RULES = (field: string) =>
     `Ignoring call of \`${field}\` as no further rules are allowed. Most likely, you passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
 
-type NodeCallback = (
+export type StateChangedEventHandler = (
     event: StateChangedEvent,
     toolkit: HomeAssistantToolkit
 ) => void;
 
-export type HomeAssistantStateEventHandler = (
+export type NodeCallback = (
     event: StateChangedEvent,
     toolkit: HomeAssistantToolkit
 ) => void;
-
-interface Cancelable {
-    cancel(): void;
-}
-
-export type DebouncedHomeAssistantStateEventHandler = HomeAssistantStateEventHandler &
-    Cancelable;
 
 export class Builder {
     public and = this; // TODO: allow multiple chains
@@ -116,6 +108,10 @@ export class Builder {
             return this;
         }
 
+        console.warn(
+            "`for` currently is unsupported. Any delay specified will be treaded as `0`."
+        );
+
         switch (unit) {
             case "seconds":
                 this.timeout = value * 1000;
@@ -135,14 +131,16 @@ export class Builder {
         return this;
     };
 
-    do = (callback: NodeCallback): DebouncedHomeAssistantStateEventHandler =>
-        debounce<HomeAssistantStateEventHandler>((event, toolkit) => {
-            const allRulesEvaluateToTrue = this.rules.every(
-                (rule) => rule.test(event) === true
-            );
+    do = (callback: NodeCallback): StateChangedEventHandler => async (
+        event,
+        toolkit
+    ) => {
+        const allRulesEvaluateToTrue = (
+            await Promise.all(this.rules.map((rule) => rule.test(event)))
+        ).every((res) => res === true);
 
-            if (allRulesEvaluateToTrue) {
-                callback(event, toolkit);
-            }
-        }, this.timeout);
+        if (allRulesEvaluateToTrue) {
+            callback(event, toolkit);
+        }
+    };
 }
