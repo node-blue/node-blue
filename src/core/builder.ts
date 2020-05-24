@@ -1,50 +1,76 @@
+import {
+    AllConditions,
+    AnyConditions,
+    ConditionProperties,
+    Engine,
+} from "json-rules-engine";
 import { debounce } from "lodash";
 
 import { HomeAssistantToolkit, StateChangedEvent } from "./homeassistant";
-import { Rule, EqualsRule, FieldChangedRule } from "./rule";
 
-const ERR_NO_FURTHER_RULES = (field: string) =>
-    `Ignoring call of \`${field}\` as no further rules are allowed. Most likely, you passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
+const ERR_NO_FURTHER_RULES = `No further rules are allowed. You passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
 
 export type StateChangedEventHandler = (
     event: StateChangedEvent,
     toolkit: HomeAssistantToolkit
 ) => void;
 
+export type NodeConditionChecker = (
+    event: StateChangedEvent,
+    toolkit: HomeAssistantToolkit
+) => boolean;
+
 export type NodeCallback = (
     event: StateChangedEvent,
     toolkit: HomeAssistantToolkit
 ) => void;
 
-export class Builder {
-    public and = this; // TODO: allow multiple chains
-    public or = this; // TODO: allow for "or" conditions
-
-    private allowNewRules: boolean = true;
-    private rules: Rule[] = [];
+export class NodeBuilder {
+    private conditions: (
+        | AllConditions
+        | AnyConditions
+        | ConditionProperties
+    )[][] = [[]];
+    private conditionIndex = 0;
+    private conditionChecker?: NodeConditionChecker;
     private timeout: number = 0;
 
-    constructor(rules?: Rule[], allowNewRules: boolean = true) {
-        if (rules) this.rules = rules;
-        this.allowNewRules = allowNewRules;
+    constructor(initalizer?: string | NodeConditionChecker) {
+        if (typeof initalizer === "string") {
+            this.conditions[this.conditionIndex].push({
+                fact: "data",
+                operator: "equal",
+                path: "entity_id",
+                value: initalizer,
+            });
+        } else if (initalizer === undefined) {
+            this.conditionChecker = () => true;
+        } else {
+            this.conditionChecker = initalizer;
+        }
     }
 
-    changes = (...paths: string[]) => {
+    changes = (path?: string) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (!this.allowNewRules) {
-            console.warn(ERR_NO_FURTHER_RULES("changes"));
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // If no paths are specified, we don't need to add
+        // If no path is specified, we don't need to add
         // any additional rules:
-        if (paths.length === 0) return this;
+        if (!path) return this;
 
-        // If there are paths, we add a rule for each:
-        paths.forEach((path) => {
-            const rule = new FieldChangedRule(path);
-            this.rules.push(rule);
+        // If a path is specified, we add a condition:
+        this.conditions[this.conditionIndex].push({
+            fact: "data",
+            operator: "notEqual",
+            path: `old_state.${path}`,
+            value: {
+                fact: "data",
+                path: `new_state.${path}`,
+            },
         });
 
         return this;
@@ -55,20 +81,33 @@ export class Builder {
     from = (value: string, path: string = "state") => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (!this.allowNewRules) {
-            console.warn(ERR_NO_FURTHER_RULES("from"));
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // First, define a rule that checks whether the specified
-        // path has changed at all:
-        const changedRule = new FieldChangedRule(path);
-        this.rules.push(changedRule);
-
-        // Then, define a rule that checks whether the old value
-        // was the specified value:
-        const fromRule = new EqualsRule(`old_state.${path}`, value);
-        this.rules.push(fromRule);
+        // Add two conditions to our rule:
+        this.conditions[this.conditionIndex].push({
+            all: [
+                // Check whether the field has actually changed:
+                {
+                    fact: "data",
+                    operator: "notEqual",
+                    path: `old_state.${path}`,
+                    value: {
+                        fact: "data",
+                        path: `new_state.${path}`,
+                    },
+                },
+                // Check whether the old value is equal to what was specified:
+                {
+                    fact: "data",
+                    operator: "equal",
+                    path: `old_state.${path}`,
+                    value,
+                },
+            ],
+        });
 
         return this;
     };
@@ -78,20 +117,33 @@ export class Builder {
     to = (value: string, path: string = "state") => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (!this.allowNewRules) {
-            console.warn(ERR_NO_FURTHER_RULES("to"));
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // First, define a rule that checks whether the specified
-        // path has changed at all:
-        const changedRule = new FieldChangedRule(path);
-        this.rules.push(changedRule);
-
-        // Then, define a rule that checks whether the old value
-        // was the specified value:
-        const toRule = new EqualsRule(`new_state.${path}`, value);
-        this.rules.push(toRule);
+        // Add two conditions to our rule:
+        this.conditions[this.conditionIndex].push({
+            all: [
+                // Check whether the field has actually changed:
+                {
+                    fact: "data",
+                    operator: "notEqual",
+                    path: `old_state.${path}`,
+                    value: {
+                        fact: "data",
+                        path: `new_state.${path}`,
+                    },
+                },
+                // Check whether the new value is equal to what was specified:
+                {
+                    fact: "data",
+                    operator: "equal",
+                    path: `new_state.${path}`,
+                    value,
+                },
+            ],
+        });
 
         return this;
     };
@@ -104,8 +156,8 @@ export class Builder {
     ) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (!this.allowNewRules) {
-            console.warn(ERR_NO_FURTHER_RULES("for"));
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
@@ -133,24 +185,71 @@ export class Builder {
         return this;
     };
 
+    and = () => {
+        // If we don't allow new rules, this shouldn't be called,
+        // so throw an error if it is:
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
+            return this;
+        }
+
+        // We're going to keep adding conditions to the first set, because
+        // all of these will have to match, so we can just return the builder:
+        return this;
+    };
+
+    or = () => {
+        // If we don't allow new rules, this shouldn't be called,
+        // so throw an error if it is:
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
+            return this;
+        }
+
+        // We have to increment this.conditionalIndex, as we're starting a new set:
+        this.conditionIndex++;
+        // TODO: Figure out a way to force use of 'when' after this.
+        return this;
+    };
+
+    when = (entity_id: string) => {
+        // If we don't allow new rules, this shouldn't be called,
+        // so throw an error if it is:
+        if (this.conditionChecker) {
+            console.warn(ERR_NO_FURTHER_RULES);
+            return this;
+        }
+
+        // TODO: Write `when` implementation here instead of in a separate file
+        // TODO: Rename this to when, looks cooler
+        // TODO: initialize here
+        return this;
+    };
+
     do = (callback: NodeCallback): StateChangedEventHandler => {
-        const debounced = debounce(callback, this.timeout);
+        const debouncedCallback = debounce(callback, this.timeout);
+        const ruleEngine = new Engine([
+            {
+                conditions: {
+                    any: this.conditions.map((conditionSet) => ({
+                        all: conditionSet,
+                    })),
+                },
+                event: {
+                    type: "conditions-met",
+                },
+            },
+        ]);
 
         return async (event, toolkit) => {
-            const allRulesEvaluateToTrue = (
-                await Promise.all(this.rules.map((rule) => rule.test(event)))
-            ).every((res) => res === true);
+            const results = await ruleEngine.run(event);
 
-            if (allRulesEvaluateToTrue) {
+            if (results.events.length > 0) {
                 // All rules are true, cancel any previously active calls:
-                debounced.cancel();
+                debouncedCallback.cancel();
 
                 // And call the debounced callback again:
-                debounced(event, toolkit);
-            } else {
-                // TODO: check why the rules didn't all match,
-                // and cancel accordingly
-                // debounced.cancel();
+                debouncedCallback(event, toolkit);
             }
         };
     };

@@ -38,6 +38,7 @@ export default {
         "path",
         "stream",
         "tls",
+        "tty",
         "utf-8-validate",
         "util",
         "url",

@@ -5,15 +5,12 @@ import path from "path";
 
 import { StateChangedEventHandler } from "./builder";
 import { connect, HomeAssistantToolkit } from "./homeassistant";
-import { when, When } from "./when";
+import { when } from "./when";
 
 config();
 const { HASS_HOST, HASS_PORT, HASS_SECURE, HASS_TOKEN } = process.env;
 
-type Node = (
-    when: When,
-    toolkit: HomeAssistantToolkit
-) => StateChangedEventHandler;
+type Node = (when, toolkit: HomeAssistantToolkit) => StateChangedEventHandler;
 
 export const init = async (nodes: string = "nodes", options: any) => {
     const host = options.host || HASS_HOST;
