@@ -18,6 +18,7 @@ export type NodeCallback = (
 
 export class Builder {
     public and = this; // TODO: allow multiple chains
+    public or = this; // TODO: allow for "or" conditions
 
     private allowNewRules: boolean = true;
     private rules: Rule[] = [];
@@ -108,6 +109,7 @@ export class Builder {
             return this;
         }
 
+        // FIXME: Figure out to way to implement this.
         console.warn(
             "`for` currently is unsupported. Any delay specified will be treaded as `0`."
         );
@@ -131,16 +133,25 @@ export class Builder {
         return this;
     };
 
-    do = (callback: NodeCallback): StateChangedEventHandler => async (
-        event,
-        toolkit
-    ) => {
-        const allRulesEvaluateToTrue = (
-            await Promise.all(this.rules.map((rule) => rule.test(event)))
-        ).every((res) => res === true);
+    do = (callback: NodeCallback): StateChangedEventHandler => {
+        const debounced = debounce(callback, this.timeout);
 
-        if (allRulesEvaluateToTrue) {
-            callback(event, toolkit);
-        }
+        return async (event, toolkit) => {
+            const allRulesEvaluateToTrue = (
+                await Promise.all(this.rules.map((rule) => rule.test(event)))
+            ).every((res) => res === true);
+
+            if (allRulesEvaluateToTrue) {
+                // All rules are true, cancel any previously active calls:
+                debounced.cancel();
+
+                // And call the debounced callback again:
+                debounced(event, toolkit);
+            } else {
+                // TODO: check why the rules didn't all match,
+                // and cancel accordingly
+                // debounced.cancel();
+            }
+        };
     };
 }

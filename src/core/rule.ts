@@ -25,16 +25,6 @@ export class EmptyRule extends Rule {
     }
 }
 
-export class EntityRule extends Rule {
-    constructor(entity_id: string) {
-        const handler: RuleHandler = (event) => {
-            return event.data.entity_id === entity_id;
-        };
-
-        super(handler);
-    }
-}
-
 export class EqualsRule extends Rule {
     constructor(path: string, expected: string) {
         const handler: RuleHandler = (event) => {

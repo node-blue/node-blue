@@ -1,5 +1,5 @@
 import { Builder } from "./builder";
-import { Rule, RuleHandler, EmptyRule, EntityRule } from "./rule";
+import { Rule, RuleHandler, EmptyRule, EqualsRule } from "./rule";
 
 export type When = (initializer?: RuleHandler | string) => Builder;
 
@@ -16,7 +16,7 @@ export const when: When = (initializer) => {
 
         // We are going to respond to state changes for a specific entity,
         // and allow further specification of other rules:
-        return new Builder([new EntityRule(initializer)]);
+        return new Builder([new EqualsRule("entity_id", initializer)]);
     }
 
     // The user has provided his own way of evaluating rules, so we

@@ -36,7 +36,7 @@ export type HomeAssistantResult<T = null> = HomeAssistantMessage & {
     id: number;
     type: "result";
     success: boolean;
-    result?: T;
+    result: T;
     error?: {
         code: 1 | 2 | 3;
         message: string;
@@ -68,12 +68,26 @@ export type HomeAssistantClient = {
         event_type: string,
         callback: (event: HomeAssistantEvent) => void
     ) => EventEmitter;
+    callService: (
+        domain: string,
+        service: string,
+        service_data?: {
+            [key: string]: any;
+        }
+    ) => Promise<null>;
     emitter: EventEmitter;
 };
+
 export type HomeAssistantToolkit = {
+    call: (
+        serviceCall: string,
+        service_data?: {
+            [key: string]: any;
+        }
+    ) => Promise<null>;
     diff: (event: StateChangedEvent) => rdiffResult[];
-    entity: (entity_id: string) => Promise<HomeAssistantEntity>;
-    states: () => Promise<HomeAssistantEntity[]>;
+    entity: (entity_id: string) => Promise<HomeAssistantEntity | undefined>;
+    entities: (...entity_ids: string[]) => Promise<HomeAssistantEntity[]>;
 };
 
 const createHomeAssistantClientAndToolkit = ({
@@ -83,9 +97,9 @@ const createHomeAssistantClientAndToolkit = ({
     emitter: EventEmitter;
     ws: { send: (data: any) => void };
 }): [HomeAssistantClient, HomeAssistantToolkit] => {
-    const once = <T = unknown>(event: string) =>
+    const once = <T>(event: string) =>
         new Promise<T>((resolve) =>
-            emitter.once(event, (message: HomeAssistantResult) =>
+            emitter.once(event, (message: HomeAssistantResult<T>) =>
                 resolve(message.result)
             )
         );
@@ -104,19 +118,37 @@ const createHomeAssistantClientAndToolkit = ({
         return emitter.on(event_type, callback);
     };
 
-    const states = async (): Promise<HomeAssistantEntity[]> => {
+    // Function to call a service:
+    const callService = (
+        domain: string,
+        service: string,
+        service_data?: { [key: string]: any }
+    ) => {
+        const id = messageId;
+        ws.send({ id, domain, service, service_data });
+        return once<null>(`result_$id`);
+    };
+
+    // Alternative function to call a service:
+    const call = (
+        serviceCall: string,
+        service_data?: { [key: string]: any }
+    ) => {
+        const [domain, entity, service] = serviceCall.split(".");
+        return callService(domain, service, {
+            entity_id: `${domain}.${entity}`,
+            ...service_data,
+        });
+    };
+
+    // Function to get all states:
+    const states = async () => {
         const id = messageId;
         ws.send({ id, type: "get_states" });
-        return once(`result_${id}`);
+        return once<HomeAssistantEntity[]>(`result_${id}`);
     };
 
-    const entity = async (
-        entity_id: string
-    ): Promise<HomeAssistantEntity | undefined> => {
-        const entities = await states();
-        return entities.find((entity) => entity.entity_id === entity_id);
-    };
-
+    // Function to generate the difference between the old state and the new state:
     const diff = (event: StateChangedEvent) => {
         const oldState = event.data.old_state;
         const newState = event.data.new_state;
@@ -124,15 +156,34 @@ const createHomeAssistantClientAndToolkit = ({
         return getDiff(oldState, newState, true);
     };
 
+    // Function to get a single entity:
+    const entity = async (entity_id: string) => {
+        const entities = await states();
+        return entities.find((entity) => entity.entity_id === entity_id);
+    };
+
+    // Function to get a number of entities at once:
+    const entities = async (...entity_ids: string[]) => {
+        if (entity_ids.length === 0) return [];
+        const entities = await states();
+        return entities.filter(({ entity_id }) =>
+            entity_ids.includes(entity_id)
+        );
+    };
+
+    // Generate the client:
     const client: HomeAssistantClient = {
         addEventListener,
+        callService,
         emitter,
     };
 
+    // Generate the toolkit:
     const toolkit: HomeAssistantToolkit = {
+        call,
         diff,
         entity,
-        states,
+        entities,
     };
 
     return [client, toolkit];

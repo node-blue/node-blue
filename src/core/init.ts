@@ -96,10 +96,15 @@ export const init = async (nodes: string = "nodes", options: any) => {
                 console.log(`Removed handler for ${path}`);
             });
         } catch (error) {
-            console.error("Error while setting up, TODO: handle");
+            console.error(
+                `Encountered an error while setting up: ${error.message}`
+            );
+            console.log("Exiting...");
+            process.exit(1);
         }
     } catch (error) {
         console.error(`Unable to connect to Home Assistant: ${error.message}`);
         console.log("Exiting...");
+        process.exit(1);
     }
 };

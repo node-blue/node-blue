@@ -225,10 +225,3 @@ $ npm start
 Or run `npm run build` yourself and use the CLI afterwards.
 
 All of the scripts above configure the CLI to read from the `.test` folder instead of the usual default.
-
-## TODO
-
--   [ ] Generate and export type declarations
--   [ ] Handle errors more gracefully
--   [ ] Add some colour to the CLI's output?
--   [ ] Get to doing those todo's in the code
