@@ -231,31 +231,20 @@ type ConnectOptions = {
     token?: string;
 };
 
-const defaultOptions: ConnectOptions = {
-    host: "hassio.local",
-    path: "/api/websocket",
-    port: 8123,
-    protocol: "ws",
-};
-
 export const connect = async (
-    callerOptions: Partial<ConnectOptions> = {}
+    options: ConnectOptions
 ): Promise<[HomeAssistantClient, HomeAssistantToolkit]> => {
     const emitter = new EventEmitter();
     const event = (event: string) =>
         new Promise((resolve) => emitter.once(event, resolve));
 
-    // Combine provided options with defaults:
     const {
         host,
         path,
         port,
         protocol,
         token: access_token,
-    }: ConnectOptions = {
-        ...defaultOptions,
-        ...callerOptions,
-    };
+    }: ConnectOptions = options;
 
     // Create a handler for WebSocket errors:
     const onError: WebSocketOptions["onError"] = (error) => {

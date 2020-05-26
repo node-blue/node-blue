@@ -1,20 +1,35 @@
 import { watch } from "chokidar";
 import { config } from "dotenv";
 import { isUndefined } from "lodash";
-import path from "path";
+import { join } from "path";
 
 import { StateChangedEventHandler } from "./builder";
 import { connect, HomeAssistantToolkit } from "./homeassistant";
 import { when } from "./when";
 
-config();
-const { HASS_HOST, HASS_PORT, HASS_SECURE, HASS_TOKEN } = process.env;
+type InitOptions = {
+    host?: string;
+    path?: string;
+    port?: number;
+    secure?: boolean;
+    token?: string;
+};
 
 type Node = (when, toolkit: HomeAssistantToolkit) => StateChangedEventHandler;
 
-export const init = async (nodes: string = "nodes", options: any) => {
-    const host = options.host || HASS_HOST;
-    const port = options.port || HASS_PORT;
+config();
+const {
+    HASS_HOST,
+    HASS_PATH,
+    HASS_PORT,
+    HASS_SECURE,
+    HASS_TOKEN,
+} = process.env;
+
+export const init = async (nodes: string = "nodes", options: InitOptions) => {
+    const host = options.host || HASS_HOST || "hassio.local";
+    const path = options.path || HASS_PATH || "/api/websocket";
+    const port = options.port || parseInt(HASS_PORT || "") || 8123;
     const protocol = [options.secure, HASS_SECURE].every(isUndefined)
         ? "ws"
         : "wss";
@@ -25,6 +40,7 @@ export const init = async (nodes: string = "nodes", options: any) => {
         console.log("Connecting to Home Assistant...");
         const [{ emitter }, toolkit] = await connect({
             host,
+            path,
             port,
             protocol,
             token,
@@ -35,7 +51,7 @@ export const init = async (nodes: string = "nodes", options: any) => {
 
         // Set up listeners for file changes:
         try {
-            const watcher = watch(path.join(process.cwd(), nodes));
+            const watcher = watch(join(process.cwd(), nodes));
             const listeners = {};
 
             // Handle a new node being added:
