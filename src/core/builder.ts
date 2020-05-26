@@ -18,7 +18,7 @@ export type StateChangedEventHandler = (
 export type NodeConditionChecker = (
     event: StateChangedEvent,
     toolkit: HomeAssistantToolkit
-) => boolean;
+) => boolean | Promise<boolean>;
 
 export type NodeCallback = (
     event: StateChangedEvent,
@@ -228,6 +228,23 @@ export class NodeBuilder {
 
     do = (callback: NodeCallback): StateChangedEventHandler => {
         const debouncedCallback = debounce(callback, this.timeout);
+
+        if (this.conditionChecker !== undefined) {
+            const conditionChecker = this.conditionChecker;
+
+            return async (event, toolkit) => {
+                const result = await conditionChecker(event, toolkit);
+
+                if (result === true) {
+                    // Callback checker returned `true`, cancel any previously active calls:
+                    debouncedCallback.cancel();
+
+                    // And call the debounced callback again:
+                    debouncedCallback(event, toolkit);
+                }
+            };
+        }
+
         const ruleEngine = new Engine([
             {
                 conditions: {
