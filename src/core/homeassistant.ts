@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import WebSocket from "isomorphic-ws";
+import { get } from "lodash";
 import { getDiff, rdiffResult } from "recursive-diff";
 
 let messageId = 1;
@@ -149,11 +150,19 @@ const createHomeAssistantClientAndToolkit = ({
     };
 
     // Function to generate the difference between the old state and the new state:
-    const diff = (event: StateChangedEvent) => {
-        const oldState = event.data.old_state;
-        const newState = event.data.new_state;
+    const diff = (A: StateChangedEvent | any, B?: any) => {
+        const oldState = get(A, "data.old_state");
+        const newState = get(A, "data.new_state");
 
-        return getDiff(oldState, newState, true);
+        if (A && !B && oldState && newState) {
+            // User passed the event object, return a diff between
+            // the old state and the new state:
+
+            return getDiff(oldState, newState, true);
+        }
+
+        // User passed two objects:
+        return getDiff(A, B);
     };
 
     // Function to get a single entity:
