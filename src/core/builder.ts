@@ -1,59 +1,53 @@
-import {
-    AllConditions,
-    AnyConditions,
-    ConditionProperties,
-    Engine,
-} from "json-rules-engine";
-import { debounce } from "lodash";
+import { debounce, every, keys, map, set } from "lodash";
 
-import { HomeAssistantToolkit, StateChangedEvent } from "./homeassistant";
+import { StateChangedEvent } from "./homeassistant";
+import {
+    EntityRule,
+    EqualsRule,
+    FieldChangedRule,
+    Rule,
+    RuleHandler,
+    EmptyRule,
+} from "./rule";
+
+export type NodeCallback = (event: StateChangedEvent) => Promise<void>;
+
+type RuleSet = {
+    [hash: string]: RuleHandler;
+};
+
+export type StateChangedEventHandler = (
+    event: StateChangedEvent
+) => Promise<void>;
 
 const ERR_NO_FURTHER_RULES = `No further rules are allowed. You passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
 
-export type StateChangedEventHandler = (
-    event: StateChangedEvent,
-    toolkit: HomeAssistantToolkit
-) => void;
-
-export type NodeConditionChecker = (
-    event: StateChangedEvent,
-    toolkit: HomeAssistantToolkit
-) => boolean | Promise<boolean>;
-
-export type NodeCallback = (
-    event: StateChangedEvent,
-    toolkit: HomeAssistantToolkit
-) => void;
-
 export class NodeBuilder {
-    private conditions: (
-        | AllConditions
-        | AnyConditions
-        | ConditionProperties
-    )[][] = [[]];
-    private conditionIndex = 0;
-    private conditionChecker?: NodeConditionChecker;
+    private callRules: RuleSet = {};
+    private cancelRules: RuleSet = {};
+    private nextFields: string[] = ["changes", "turns"];
     private timeout: number = 0;
 
-    constructor(initalizer?: string | NodeConditionChecker) {
+    constructor(initalizer?: string | RuleHandler) {
         if (typeof initalizer === "string") {
-            this.conditions[this.conditionIndex].push({
-                fact: "data",
-                operator: "equal",
-                path: "entity_id",
-                value: initalizer,
-            });
-        } else if (initalizer === undefined) {
-            this.conditionChecker = () => true;
+            const entityRule = new EntityRule(initalizer);
+            set(this.callRules, entityRule.hash, entityRule.test);
+            set(this.cancelRules, entityRule.hash, entityRule.test);
+        } else if (typeof initalizer === "function") {
+            const rule = new Rule(initalizer);
+            set(this.callRules, rule.hash, rule.test);
+            this.nextFields = [];
         } else {
-            this.conditionChecker = initalizer;
+            const emptyRule = new EmptyRule();
+            set(this.callRules, emptyRule.hash, emptyRule.test);
+            this.nextFields = [];
         }
     }
 
     changes = (path?: string) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("changes")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
@@ -62,16 +56,12 @@ export class NodeBuilder {
         // any additional rules:
         if (!path) return this;
 
-        // If a path is specified, we add a condition:
-        this.conditions[this.conditionIndex].push({
-            fact: "data",
-            operator: "notEqual",
-            path: `old_state.${path}`,
-            value: {
-                fact: "data",
-                path: `new_state.${path}`,
-            },
-        });
+        // If a path is specified, we add a rule:
+        const rule = new FieldChangedRule(path);
+        set(this.callRules, rule.hash, rule.test);
+
+        // Set the next possible calls (`do` can always be called):
+        this.nextFields = ["from", "to", "for"];
 
         return this;
     };
@@ -81,33 +71,28 @@ export class NodeBuilder {
     from = (value: string, path: string = "state") => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("from")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // Add two conditions to our rule:
-        this.conditions[this.conditionIndex].push({
-            all: [
-                // Check whether the field has actually changed:
-                {
-                    fact: "data",
-                    operator: "notEqual",
-                    path: `old_state.${path}`,
-                    value: {
-                        fact: "data",
-                        path: `new_state.${path}`,
-                    },
-                },
-                // Check whether the old value is equal to what was specified:
-                {
-                    fact: "data",
-                    operator: "equal",
-                    path: `old_state.${path}`,
-                    value,
-                },
-            ],
-        });
+        // First, define a rule that checks whether the specified
+        // path has changed at all:
+        const changedRule = new FieldChangedRule(path);
+        set(this.callRules, changedRule.hash, changedRule.test);
+
+        // Then, define a rule that checks whether the old value
+        // was the specified value:
+        const fromRule = new EqualsRule(`old_state.${path}`, value);
+        set(this.callRules, fromRule.hash, fromRule.test);
+
+        // Finally, if we move back to the value that we wanted to move
+        // away from, we need to cancel the callback:
+        const toRule = new EqualsRule(`new_state.${path}`, value);
+        set(this.cancelRules, toRule.hash, toRule.test);
+
+        // Set the next possible calls (`do` can always be called):
+        this.nextFields = ["to", "for"];
 
         return this;
     };
@@ -117,36 +102,40 @@ export class NodeBuilder {
     to = (value: string, path: string = "state") => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("to")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // Add two conditions to our rule:
-        this.conditions[this.conditionIndex].push({
-            all: [
-                // Check whether the field has actually changed:
-                {
-                    fact: "data",
-                    operator: "notEqual",
-                    path: `old_state.${path}`,
-                    value: {
-                        fact: "data",
-                        path: `new_state.${path}`,
-                    },
-                },
-                // Check whether the new value is equal to what was specified:
-                {
-                    fact: "data",
-                    operator: "equal",
-                    path: `new_state.${path}`,
-                    value,
-                },
-            ],
-        });
+        // First, define a rule that checks whether the specified
+        // path has changed at all:
+        const changedRule = new FieldChangedRule(path);
+        set(this.callRules, changedRule.hash, changedRule.test);
+
+        // Then, define a rule that checks whether the new value
+        // was the specified value:
+        const toRule = new EqualsRule(`new_state.${path}`, value);
+        set(this.callRules, toRule.hash, toRule.test);
+
+        // Finally, if we move away from the value that we wanted to move
+        // to, we need to cancel the callback:
+        const fromRule = new EqualsRule(`old_state.${path}`, value);
+        set(this.cancelRules, fromRule.hash, fromRule.test);
+
+        // Set the next possible calls (`do` can always be called):
+        this.nextFields = ["from", "for"];
 
         return this;
     };
+
+    // Alias for `changes.to`:
+    turns = (state: string) => {
+        return this.changes("state").to(state);
+    };
+
+    // Wrappers around `turns`, aliases for `changes.to`:
+    becomes = this.turns;
+    switches = this.turns;
 
     // Add a duration during which all rules should evaluate to
     // true:
@@ -156,16 +145,13 @@ export class NodeBuilder {
     ) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("for")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // FIXME: Figure out to way to implement this.
-        console.warn(
-            "`for` currently is unsupported. Any delay specified will be treaded as `0`."
-        );
-
+        // Set the correct timeout based on the passed in unit,
+        // and default to milliseconds:
         switch (unit) {
             case "seconds":
                 this.timeout = value * 1000;
@@ -182,91 +168,81 @@ export class NodeBuilder {
                 break;
         }
 
-        return this;
-    };
+        // Set the next possible calls (`do` can always be called):
+        this.nextFields = [];
 
-    and = () => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (this.conditionChecker) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
-        // We're going to keep adding conditions to the first set, because
-        // all of these will have to match, so we can just return the builder:
         return this;
     };
 
     or = () => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("or")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // We have to increment this.conditionalIndex, as we're starting a new set:
-        this.conditionIndex++;
-        // TODO: Figure out a way to force use of 'when' after this.
+        // TODO: Implement.
+        // TODO: Set the next possible calls (`do` can always be called)
+
         return this;
     };
 
     when = (entity_id: string) => {
         // If we don't allow new rules, this shouldn't be called,
         // so throw an error if it is:
-        if (this.conditionChecker) {
+        if (!this.nextFields.includes("when")) {
             console.warn(ERR_NO_FURTHER_RULES);
             return this;
         }
 
-        // TODO: Write `when` implementation here instead of in a separate file
-        // TODO: Rename this to when, looks cooler
-        // TODO: initialize here
+        // TODO: Implement.
+        // TODO: Set the next possible calls (`do` can always be called)
+
         return this;
     };
 
     do = (callback: NodeCallback): StateChangedEventHandler => {
         const debouncedCallback = debounce(callback, this.timeout);
 
-        if (this.conditionChecker !== undefined) {
-            const conditionChecker = this.conditionChecker;
+        return async (event) => {
+            const isTrue = (res: boolean) => res === true;
+            const testRule = (ruleHandler: RuleHandler) => ruleHandler(event);
 
-            return async (event, toolkit) => {
-                const result = await conditionChecker(event, toolkit);
+            // Always evaluate all the call rules:
+            const allCallRulesEvaluateToTrue = every(
+                await Promise.all(map(this.callRules, testRule)),
+                isTrue
+            );
 
-                if (result === true) {
-                    // Callback checker returned `true`, cancel any previously active calls:
-                    debouncedCallback.cancel();
+            // Only evaluate the cancel rules if the timeout is set.
+            // Only evaluate the cancel rules if there is more than one,
+            // because that would be the entity rule. Only checking that rule
+            // would often result in both the cancel and call rules evaluating
+            // to true, which shouldn't happen.
+            const allCancelRulesEvaluateToTrue =
+                this.timeout > 0 &&
+                keys(this.cancelRules).length > 1 &&
+                every(
+                    await Promise.all(map(this.cancelRules, testRule)),
+                    isTrue
+                );
 
-                    // And call the debounced callback again:
-                    debouncedCallback(event, toolkit);
-                }
-            };
-        }
+            // Throw if the callback should both be called and cancelled:
+            if (allCallRulesEvaluateToTrue && allCancelRulesEvaluateToTrue) {
+                throw new Error(
+                    "Callback should be called and cancelled at the same time!"
+                );
+            }
 
-        const ruleEngine = new Engine([
-            {
-                conditions: {
-                    any: this.conditions.map((conditionSet) => ({
-                        all: conditionSet,
-                    })),
-                },
-                event: {
-                    type: "conditions-met",
-                },
-            },
-        ]);
-
-        return async (event, toolkit) => {
-            const results = await ruleEngine.run(event);
-
-            if (results.events.length > 0) {
-                // All rules are true, cancel any previously active calls:
+            // Cancel the callback if either condition is true:
+            if (allCallRulesEvaluateToTrue || allCancelRulesEvaluateToTrue) {
                 debouncedCallback.cancel();
+            }
 
-                // And call the debounced callback again:
-                debouncedCallback(event, toolkit);
+            // Call the debounced callback:
+            if (allCallRulesEvaluateToTrue) {
+                debouncedCallback(event);
             }
         };
     };
