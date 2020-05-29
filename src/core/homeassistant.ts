@@ -86,7 +86,7 @@ export type HomeAssistantToolkit = {
             [key: string]: any;
         }
     ) => Promise<null>;
-    diff: (event: StateChangedEvent) => rdiffResult[];
+    diff: (A: StateChangedEvent | any, B?: any) => rdiffResult[];
     entity: (entity_id: string) => Promise<HomeAssistantEntity | undefined>;
     entities: (...entity_ids: string[]) => Promise<HomeAssistantEntity[]>;
 };
