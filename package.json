@@ -1,26 +1,20 @@
 {
     "name": "@node-blue/node-blue",
     "version": "0.4.0",
-    "description": "Node automation engine for Home Assistant",
+    "description": "Node.js automation engine for Home Assistant",
     "main": "dist/index.js",
     "module": "dist/index.es.js",
-    "bin": {
-        "node-blue": "dist/index.js"
-    },
     "files": [
         "dist"
     ],
+    "types": "dist/index.d.ts",
     "repository": "git@github.com:node-blue/node-blue.git",
     "author": "Niels Bik <hey@nielsbik.nl>",
     "license": "Apache-2.0",
     "dependencies": {
         "chokidar": "^3.4.0",
-        "commander": "^5.1.0",
-        "dotenv": "^8.2.0",
-        "figlet": "^1.4.0",
         "isomorphic-ws": "^4.0.1",
         "lodash": "^4.17.15",
-        "nodemon": "^2.0.4",
         "recursive-diff": "^1.0.6",
         "ws": "^7.3.0"
     },
@@ -28,13 +22,12 @@
         "@rollup/plugin-json": "^4.0.3",
         "@rollup/plugin-node-resolve": "^7.1.3",
         "@rollup/plugin-typescript": "^4.1.1",
-        "@types/figlet": "^1.2.0",
         "@types/lodash": "^4.14.152",
-        "@types/node": "^14.0.4",
         "@types/ws": "^7.2.4",
         "np": "^6.2.3",
         "rollup": "^2.10.2",
         "rollup-plugin-commonjs": "^10.1.0",
+        "rollup-plugin-typescript2": "^0.27.1",
         "tslib": "^2.0.0",
         "typescript": "^3.9.3"
     },
@@ -44,10 +37,8 @@
     },
     "scripts": {
         "build": "rollup -c",
-        "build:watch": "rollup -cw",
-        "dev": "nodemon --exec 'node-blue start .test'",
+        "dev": "rollup -cw",
         "release": "np",
-        "start": "npm run build && node-blue start .test",
         "test": "echo \"No test specified\""
     },
     "publishConfig": {
