@@ -10,6 +10,7 @@ type InitOptions = {
     path?: string;
     port?: number;
     secure?: boolean;
+    socket?: string;
     token: string;
 };
 
@@ -23,6 +24,7 @@ export const init = async (nodes: string = "nodes", options: InitOptions) => {
     const path = options.path || "/api/websocket";
     const port = options.port || 8123;
     const protocol = options.secure ? "wss" : "ws";
+    const socket = options.socket;
     const token = options.token;
 
     try {
@@ -33,6 +35,7 @@ export const init = async (nodes: string = "nodes", options: InitOptions) => {
             path,
             port,
             protocol,
+            socket,
             token,
         });
 

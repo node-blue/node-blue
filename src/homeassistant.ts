@@ -199,10 +199,11 @@ const createHomeAssistantClientAndToolkit = ({
 };
 
 type WebSocketOptions = {
-    host: string;
-    path: string;
-    port: number;
-    protocol: "ws" | "wss";
+    host?: string;
+    path?: string;
+    port?: number;
+    protocol?: "ws" | "wss";
+    socket?: string;
     onError?: (event: WebSocket.ErrorEvent) => void;
     onMessage?: (
         event: HomeAssistantMessage | HomeAssistantResult | HomeAssistantEvent
@@ -214,10 +215,12 @@ const createWebsocket = ({
     path,
     port,
     protocol,
+    socket,
     onError,
     onMessage,
 }: WebSocketOptions) => {
-    const ws = new WebSocket(`${protocol}://${host}:${port}${path}`);
+    const location = socket || `${protocol}://${host}:${port}${path}`;
+    const ws = new WebSocket(location);
 
     if (onError) ws.onerror = onError;
     if (onMessage)
@@ -233,10 +236,11 @@ const createWebsocket = ({
 };
 
 type ConnectOptions = {
-    host: string;
-    path: string;
-    port: number;
-    protocol: "ws" | "wss";
+    host?: string;
+    path?: string;
+    port?: number;
+    protocol?: "ws" | "wss";
+    socket?: string;
     token?: string;
 };
 
@@ -252,6 +256,7 @@ export const connect = async (
         path,
         port,
         protocol,
+        socket,
         token: access_token,
     }: ConnectOptions = options;
 
@@ -285,6 +290,7 @@ export const connect = async (
         path,
         port,
         protocol,
+        socket,
         onError,
         onMessage,
     });
