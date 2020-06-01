@@ -13,6 +13,7 @@
     "license": "Apache-2.0",
     "dependencies": {
         "chokidar": "^3.4.0",
+        "dotenv": "^8.2.0",
         "isomorphic-ws": "^4.0.1",
         "lodash": "^4.17.15",
         "recursive-diff": "^1.0.6",

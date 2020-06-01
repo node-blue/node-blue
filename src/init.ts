@@ -2,42 +2,22 @@ import { watch } from "chokidar";
 import { join } from "path";
 
 import { StateChangedEventHandler } from "./builder";
-import { connect, HomeAssistantToolkit } from "./homeassistant";
+import { connect, ConnectOptions, HomeAssistantToolkit } from "./homeassistant";
 import { when, When } from "./when";
-
-type InitOptions = {
-    host?: string;
-    path?: string;
-    port?: number;
-    secure?: boolean;
-    socket?: string;
-    token: string;
-};
 
 type Node = (
     when: When,
     toolkit: HomeAssistantToolkit
 ) => StateChangedEventHandler;
 
-export const init = async (nodes: string = "nodes", options: InitOptions) => {
-    const host = options.host || "hassio.local";
-    const path = options.path || "/api/websocket";
-    const port = options.port || 8123;
-    const protocol = options.secure ? "wss" : "ws";
-    const socket = options.socket;
-    const token = options.token;
-
+export const init = async (
+    nodes: string = "nodes",
+    options: ConnectOptions = {}
+) => {
     try {
         // Connect to Home Assistant:
         console.log("Connecting to Home Assistant...");
-        const [{ emitter }, toolkit] = await connect({
-            host,
-            path,
-            port,
-            protocol,
-            socket,
-            token,
-        });
+        const [{ emitter }, toolkit] = await connect(options);
 
         // Connected to Home Assistant:
         console.log("Connected to Home Assistant!");

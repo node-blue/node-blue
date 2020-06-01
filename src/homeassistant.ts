@@ -1,7 +1,18 @@
+import { config as env } from "dotenv";
 import { EventEmitter } from "events";
 import WebSocket from "isomorphic-ws";
 import { get } from "lodash";
 import { getDiff, rdiffResult } from "recursive-diff";
+
+env();
+
+const {
+    HASS_HOST,
+    HASS_API_PATH,
+    HASS_SECURE,
+    HASS_TOKEN,
+    SUPERVISOR_TOKEN,
+} = process.env;
 
 let messageId = 1;
 
@@ -198,12 +209,15 @@ const createHomeAssistantClientAndToolkit = ({
     return [client, toolkit];
 };
 
-type WebSocketOptions = {
+export type ConnectOptions = {
     host?: string;
     path?: string;
-    port?: number;
     protocol?: "ws" | "wss";
-    socket?: string;
+    secure?: boolean;
+    token?: string;
+};
+
+type WebSocketOptions = ConnectOptions & {
     onError?: (event: WebSocket.ErrorEvent) => void;
     onMessage?: (
         event: HomeAssistantMessage | HomeAssistantResult | HomeAssistantEvent
@@ -211,16 +225,14 @@ type WebSocketOptions = {
 };
 
 const createWebsocket = ({
-    host,
-    path,
-    port,
-    protocol,
-    socket,
     onError,
     onMessage,
+    ...options
 }: WebSocketOptions) => {
-    const location = socket || `${protocol}://${host}:${port}${path}`;
-    const ws = new WebSocket(location);
+    const protocol = options.secure || HASS_SECURE ? "wss" : "ws";
+    const host = options.host || HASS_HOST || "homeassistant.local:8123";
+    const path = options.path || HASS_API_PATH || "/api/websocket";
+    const ws = new WebSocket(`${protocol}://${host}${path}`);
 
     if (onError) ws.onerror = onError;
     if (onMessage)
@@ -235,30 +247,15 @@ const createWebsocket = ({
     };
 };
 
-type ConnectOptions = {
-    host?: string;
-    path?: string;
-    port?: number;
-    protocol?: "ws" | "wss";
-    socket?: string;
-    token?: string;
-};
-
 export const connect = async (
-    options: ConnectOptions
+    connectOptions: ConnectOptions
 ): Promise<[HomeAssistantClient, HomeAssistantToolkit]> => {
     const emitter = new EventEmitter();
     const event = (event: string) =>
         new Promise((resolve) => emitter.once(event, resolve));
 
-    const {
-        host,
-        path,
-        port,
-        protocol,
-        socket,
-        token: access_token,
-    }: ConnectOptions = options;
+    const { token, ...wsOptions } = connectOptions;
+    const access_token = token || HASS_TOKEN || SUPERVISOR_TOKEN;
 
     // Create a handler for WebSocket errors:
     const onError: WebSocketOptions["onError"] = (error) => {
@@ -286,11 +283,7 @@ export const connect = async (
 
     // Create the WebSocket connection (this also starts the authentication flow):
     const ws = createWebsocket({
-        host,
-        path,
-        port,
-        protocol,
-        socket,
+        ...wsOptions,
         onError,
         onMessage,
     });
