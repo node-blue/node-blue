@@ -12,10 +12,12 @@
     "author": "Niels Bik <hey@nielsbik.nl>",
     "license": "Apache-2.0",
     "dependencies": {
+        "chai": "^4.2.0",
         "chokidar": "^3.4.0",
         "dotenv": "^8.2.0",
         "isomorphic-ws": "^4.0.1",
         "lodash": "^4.17.15",
+        "mocha": "^7.2.0",
         "recursive-diff": "^1.0.6",
         "ws": "^7.3.0"
     },
@@ -23,11 +25,14 @@
         "@rollup/plugin-json": "^4.0.3",
         "@rollup/plugin-node-resolve": "^7.1.3",
         "@rollup/plugin-typescript": "^4.1.1",
+        "@types/chai": "^4.2.11",
         "@types/lodash": "^4.14.152",
+        "@types/mocha": "^7.0.2",
         "@types/ws": "^7.2.4",
         "np": "^6.2.3",
         "rollup": "^2.10.2",
         "rollup-plugin-commonjs": "^10.1.0",
+        "ts-node": "^8.10.2",
         "tslib": "^2.0.0",
         "typescript": "^3.9.3"
     },
@@ -39,7 +44,7 @@
         "build": "rollup -c",
         "dev": "rollup -cw",
         "release": "np",
-        "test": "echo \"No test specified\""
+        "test": "env TS_NODE_PROJECT=\"tsconfig.test.json\" mocha -r ts-node/register tests/**/*.spec.ts"
     },
     "publishConfig": {
         "access": "public"

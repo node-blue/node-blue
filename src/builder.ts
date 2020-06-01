@@ -20,12 +20,9 @@ export type StateChangedEventHandler = (
     event: StateChangedEvent
 ) => Promise<void>;
 
-const ERR_NO_FURTHER_RULES = `No further rules are allowed. You passed a function into \`when\`, which means any logic determining whether or not to handle the event should be handled there.`;
-
 export class NodeBuilder {
     private callRules: RuleSet = {};
     private cancelRules: RuleSet = {};
-    private nextFields: string[] = ["changes", "turns"];
     private timeout: number = 0;
 
     constructor(initalizer?: string | RuleHandler) {
@@ -36,22 +33,13 @@ export class NodeBuilder {
         } else if (typeof initalizer === "function") {
             const rule = new Rule(initalizer);
             set(this.callRules, rule.hash, rule.test);
-            this.nextFields = [];
         } else {
             const emptyRule = new EmptyRule();
             set(this.callRules, emptyRule.hash, emptyRule.test);
-            this.nextFields = [];
         }
     }
 
     changes = (path?: string) => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("changes")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // If no path is specified, we don't need to add
         // any additional rules:
         if (!path) return this;
@@ -60,22 +48,12 @@ export class NodeBuilder {
         const rule = new FieldChangedRule(path);
         set(this.callRules, rule.hash, rule.test);
 
-        // Set the next possible calls (`do` can always be called):
-        this.nextFields = ["from", "to", "for"];
-
         return this;
     };
 
     // Add a rule that checks whether the old state equals
     // the provided value:
     from = (value: string, path: string = "state") => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("from")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // First, define a rule that checks whether the specified
         // path has changed at all:
         const changedRule = new FieldChangedRule(path);
@@ -91,22 +69,12 @@ export class NodeBuilder {
         const toRule = new EqualsRule(`new_state.${path}`, value);
         set(this.cancelRules, toRule.hash, toRule.test);
 
-        // Set the next possible calls (`do` can always be called):
-        this.nextFields = ["to", "for"];
-
         return this;
     };
 
     // Add a rule that checks whether the new state equals
     // the provided value:
     to = (value: string, path: string = "state") => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("to")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // First, define a rule that checks whether the specified
         // path has changed at all:
         const changedRule = new FieldChangedRule(path);
@@ -121,9 +89,6 @@ export class NodeBuilder {
         // to, we need to cancel the callback:
         const fromRule = new EqualsRule(`old_state.${path}`, value);
         set(this.cancelRules, fromRule.hash, fromRule.test);
-
-        // Set the next possible calls (`do` can always be called):
-        this.nextFields = ["from", "for"];
 
         return this;
     };
@@ -143,13 +108,6 @@ export class NodeBuilder {
         value: number,
         unit?: "milliseconds" | "seconds" | "minutes" | "hours"
     ) => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("for")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // Set the correct timeout based on the passed in unit,
         // and default to milliseconds:
         switch (unit) {
@@ -168,20 +126,10 @@ export class NodeBuilder {
                 break;
         }
 
-        // Set the next possible calls (`do` can always be called):
-        this.nextFields = [];
-
         return this;
     };
 
     or = () => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("or")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // TODO: Implement.
         // TODO: Set the next possible calls (`do` can always be called)
 
@@ -189,13 +137,6 @@ export class NodeBuilder {
     };
 
     when = (entity_id: string) => {
-        // If we don't allow new rules, this shouldn't be called,
-        // so throw an error if it is:
-        if (!this.nextFields.includes("when")) {
-            console.warn(ERR_NO_FURTHER_RULES);
-            return this;
-        }
-
         // TODO: Implement.
         // TODO: Set the next possible calls (`do` can always be called)
 
