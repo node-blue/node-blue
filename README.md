@@ -51,7 +51,7 @@ Consider the following usage example:
 node("example", (event, toolkit) => {
     event.entity_id.should.equal("light.living_room");
     event.new_state.state.should.equal("on");
-    event.new_state.state.should.not.equal("off");
+    event.old_state.state.should.not.equal("on");
 
     console.log("light.living_room turned on!");
 });
@@ -59,7 +59,37 @@ node("example", (event, toolkit) => {
 
 In this example, if one of the three assertions aren't met, the message will not be logged.
 
-By the way, async functions are supported, and `fetch` (based on [`node-fetch`](https://github.com/node-fetch/node-fetch)) is available globally should you need it.
+By the way, async functions are fully supported.
+
+### Helper functions
+
+In order the make things easier for you, we also provide the following functions globally:
+
+#### `either` function
+
+Simple function that takes two functions as arguments. Place your assertions in either functions. If one of the two functions does not throw, we continue execution of your `node`. If both throw, none of the conditions were met, so we stop execution. Example usage:
+
+```js
+node("either example", (event, toolkit) => {
+    event.new_state.state.should.equal("on");
+    event.old_state.state.should.not.equal("on");
+
+    either(
+        () => {
+            event.entity_id.should.equal("light.living_room");
+        },
+        () => {
+            event.entity_id.should.equal("light.kitchen");
+        }
+    );
+
+    console.log("Either light.living_room or light.kitchen turned on!");
+});
+```
+
+#### `fetch`
+
+In case you need to make API calls to something other than Home Assistant, we expose `fetch` (based on [`node-fetch`](https://github.com/node-fetch/node-fetch)) globally.
 
 ### Toolkit
 
