@@ -146,11 +146,32 @@ const createHomeAssistantClientAndToolkit = ({
         serviceCall: string,
         service_data?: { [key: string]: any }
     ) => {
-        const [domain, entity, service] = serviceCall.split(".");
-        return callService(domain, service, {
-            entity_id: `${domain}.${entity}`,
-            ...service_data,
-        });
+        const components = serviceCall.split(".");
+
+        if (components.length < 2) {
+            throw new Error(
+                `"${serviceCall} is not a valid argument for serviceCall`
+            );
+        }
+
+        if (components.length === 2) {
+            // User passed in a service in the <domain>.<service> format
+            const [domain, service] = components;
+            return callService(domain, service, service_data);
+        }
+
+        if (components.length >= 3) {
+            // User passed in our custom format <domain>.<entity_id>.<service>
+            const [domain, entity, service] = components;
+            return callService(domain, service, {
+                entity_id: `${domain}.${entity}`,
+                ...service_data,
+            });
+        }
+
+        // Code will never actually reach this point, but TypeScript
+        // needs this here in order to not error...
+        return Promise.resolve(null);
     };
 
     // Function to get all states:
