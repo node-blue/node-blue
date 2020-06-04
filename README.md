@@ -134,5 +134,10 @@ await entity("light.does_not_exist"); // resolves to `undefined`
 Similar to `entity`, but accepts an array of entity_id's to fetch at once. Returns a promise that resolves to an array of Home Assistant entity objects or undefined. Example usage:
 
 ```js
-await entities("light.living_room", "light.does_not_exist"); // resolves to [`light.living_room` entity object, `undefined`]
+await entities("light.living_room", "light.does_not_exist");
+// resolves to [`light.living_room` entity object, `undefined`]
 ```
+
+## License
+
+Node-BLUE is licensed under the [Apache 2.0 license](LICENSE).
