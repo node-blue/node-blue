@@ -3,7 +3,9 @@
     "version": "0.8.0",
     "description": "Node.js automation engine for Home Assistant",
     "main": "dist/index.js",
-    "module": "dist/index.es.js",
+    "bin": {
+        "node-blue": "dist/index.js"
+    },
     "files": [
         "dist"
     ],
