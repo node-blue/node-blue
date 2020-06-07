@@ -1,6 +1,6 @@
 {
     "name": "node-blue",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "description": "Node.js automation engine for Home Assistant",
     "main": "dist/index.js",
     "bin": {
